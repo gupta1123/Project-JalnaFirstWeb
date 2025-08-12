@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Cookies from "js-cookie";
-import type { User, AgencyContact, Pagination, Complaint } from "./types";
+import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://social-service-backend-01d8c088884a.herokuapp.com";
 
@@ -212,6 +212,68 @@ export async function assignComplaint(id: string, userId: string) {
 export async function addComplaintComment(id: string, text: string) {
   const res = await api.post(`/api/complaints/${id}/comment`, { text });
   return res.data;
+}
+
+// Tickets API
+export async function createTicket(payload: {
+  title: string;
+  description: string;
+  category?: string;
+  priority?: string;
+  location?: { zone?: string; city?: string; state?: string; area?: string };
+  tags?: string[];
+}): Promise<{ message: string; ticket: Ticket }> {
+  const res = await api.post("/api/tickets", payload);
+  return res.data as { message: string; ticket: Ticket };
+}
+
+type AdminPagination = { currentPage: number; totalPages: number; totalTickets: number; hasNextPage: boolean; hasPrevPage: boolean };
+
+export async function getMyTickets(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  category?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+}): Promise<{ tickets: Ticket[]; pagination?: AdminPagination }> {
+  const res = await api.get("/api/tickets/my-tickets", { params });
+  return res.data as { tickets: Ticket[]; pagination?: AdminPagination };
+}
+
+export async function getTicketById(id: string): Promise<Ticket> {
+  const res = await api.get(`/api/tickets/${id}`);
+  return res.data.ticket as Ticket;
+}
+
+export async function adminGetTickets(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  category?: string;
+  priority?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}): Promise<{ tickets: Ticket[]; pagination?: AdminPagination }> {
+  const res = await api.get("/api/tickets/admin/all", { params });
+  return res.data as { tickets: Ticket[]; pagination?: AdminPagination };
+}
+
+export async function adminGetTicketById(id: string): Promise<Ticket> {
+  const res = await api.get(`/api/tickets/admin/${id}`);
+  return res.data.ticket as Ticket;
+}
+
+export async function adminUpdateTicketStatus(id: string, payload: { status?: TicketStatus; resolutionNote?: string; slaDueDate?: string }) {
+  const res = await api.put(`/api/tickets/admin/${id}`, payload);
+  return res.data as { message: string; ticket: Ticket };
+}
+
+export async function adminAddNote(id: string, note: string) {
+  const res = await api.post(`/api/tickets/admin/${id}/notes`, { note });
+  return res.data as { message: string; adminNotes: Ticket["adminNotes"] };
 }
 
 // TODO: Notices/Circulars endpoints are not in the doc. Add once available.

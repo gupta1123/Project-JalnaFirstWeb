@@ -4,7 +4,6 @@ import * as React from "react";
 import { Command, LayoutDashboard, Phone, Users, FileWarning } from "lucide-react";
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
-import { NavSecondary } from "@/components/nav-secondary";
 import { UserMenu } from "@/components/UserMenu";
 import {
   Sidebar,

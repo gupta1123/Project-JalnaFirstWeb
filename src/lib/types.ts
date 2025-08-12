@@ -76,3 +76,41 @@ export type Complaint = {
   [key: string]: unknown;
 };
 
+// Tickets (new API)
+export type TicketCategory =
+  | "complaint"
+  | "support"
+  | "bug"
+  | "feature_request"
+  | "general"
+  | "technical"
+  | "billing"
+  | "other";
+
+export type TicketPriority = "low" | "medium" | "high" | "urgent";
+export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+
+export type Ticket = {
+  _id: string;
+  id?: string;
+  ticketNumber?: string;
+  title: string;
+  description: string;
+  category?: TicketCategory;
+  priority?: TicketPriority;
+  status: TicketStatus;
+  createdBy?: User | string;
+  location?: { zone?: string; city?: string; state?: string; area?: string };
+  tags?: string[];
+  escalated?: boolean;
+  slaBreached?: boolean;
+  isPublic?: boolean;
+  attachments?: unknown[];
+  internalNotes?: Array<{ note: string; addedAt?: string; addedBy?: User | string }>;
+  adminNotes?: Array<{ note: string; addedAt?: string; addedBy?: User | string }>;
+  age?: number;
+  isOverdue?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+

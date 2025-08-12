@@ -135,20 +135,20 @@ function useQuote(): string {
 
 const headerArt = {
   morning: [
-    'https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=1400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1465101162946-4377e57745c3?q=80&w=1400&auto=format&fit=crop',
+    '/morning%201.png',
+    '/morning2.png',
   ],
   night: [
-    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?q=80&w=1400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1400&auto=format&fit=crop',
+    '/Night1.png',
+    '/Night2.png',
   ],
   evening: [
-    'https://images.unsplash.com/photo-1489641493513-ba4ee84ccea9?q=80&w=1400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1502355984-b735cb2550ce?q=80&w=1400&auto=format&fit=crop',
+    '/evening1.png',
+    '/evening2.png',
   ],
   afternoon: [
-    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?q=80&w=1400&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?q=80&w=1400&auto=format&fit=crop',
+    '/afternoon1.png',
+    '/afternoon2.png',
   ],
 } as const;
 
