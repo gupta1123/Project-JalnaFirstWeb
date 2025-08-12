@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api } from '@/lib/api';
+import { api, adminGetTickets } from '@/lib/api';
 // removed charts
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
@@ -87,6 +87,33 @@ function useOverview() {
 }
 
 // weather removed
+
+/* -------------------- Ticket stats (admin) -------------------- */
+function useTicketStats() {
+  type Count = number;
+  const { data: open } = useSWR<Count>(['tickets-count', 'open'], async () => {
+    const r = await adminGetTickets({ status: 'open', page: 1, limit: 1 });
+    return r.pagination?.totalTickets ?? 0;
+  }, { revalidateOnFocus: false });
+  const { data: inProgress } = useSWR<Count>(['tickets-count', 'in_progress'], async () => {
+    const r = await adminGetTickets({ status: 'in_progress', page: 1, limit: 1 });
+    return r.pagination?.totalTickets ?? 0;
+  }, { revalidateOnFocus: false });
+  const { data: resolved } = useSWR<Count>(['tickets-count', 'resolved'], async () => {
+    const r = await adminGetTickets({ status: 'resolved', page: 1, limit: 1 });
+    return r.pagination?.totalTickets ?? 0;
+  }, { revalidateOnFocus: false });
+  const { data: closed } = useSWR<Count>(['tickets-count', 'closed'], async () => {
+    const r = await adminGetTickets({ status: 'closed', page: 1, limit: 1 });
+    return r.pagination?.totalTickets ?? 0;
+  }, { revalidateOnFocus: false });
+
+  const loading = open == null || inProgress == null || resolved == null || closed == null;
+  return {
+    counts: { open: open ?? 0, inProgress: inProgress ?? 0, resolved: resolved ?? 0, closed: closed ?? 0 },
+    isLoading: loading,
+  } as const;
+}
 
 /* -------------------- Quote bank (curated) -------------------- */
 const QUOTES: string[] = [
@@ -174,6 +201,7 @@ export default function DashboardPage() {
   const greeting = useGreeting();
   const quote = useQuote();
   const { data: overview, isLoading: loadingOverview } = useOverview();
+  const { counts: ticketCounts, isLoading: loadingTickets } = useTicketStats();
 
   const today = useMemo(() =>
     new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date()),
@@ -228,7 +256,7 @@ export default function DashboardPage() {
       <Card className="h-full">
         <CardHeader className="pb-2"><CardTitle>Complaints snapshot</CardTitle></CardHeader>
         <CardContent className="space-y-3 flex-1">
-          {loadingOverview ? (
+          {loadingTickets ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between">
@@ -240,10 +268,10 @@ export default function DashboardPage() {
           </div>
           ) : (
             <>
-              <RowStat label="Open" value={overview?.complaints?.open} badgeVariant="default" />
-              <RowStat label="In progress" value={overview?.complaints?.inProgress} badgeVariant="secondary" />
-              <RowStat label="Resolved (7d)" value={overview?.complaints?.resolved7d} badgeVariant="outline" />
-          <p className="text-xs text-muted-foreground">Hook to real stats once endpoints are ready.</p>
+              <RowStat label="Open" value={ticketCounts.open} badgeVariant="default" />
+              <RowStat label="In progress" value={ticketCounts.inProgress} badgeVariant="secondary" />
+              <RowStat label="Resolved" value={ticketCounts.resolved} badgeVariant="outline" />
+              <RowStat label="Closed" value={ticketCounts.closed} badgeVariant="outline" />
             </>
           )}
         </CardContent>
@@ -253,14 +281,14 @@ export default function DashboardPage() {
       <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
         <StatsTile label="Total users" value={overview?.totalUsers} loading={loadingOverview} />
         <StatsTile label="New this week" value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
-        <StatsTile label="Open complaints" value={overview?.complaints?.open} loading={loadingOverview} />
+        <StatsTile label="Open complaints" value={ticketCounts.open} loading={loadingTickets} />
       </div>
 
       {/* trends removed */}
 
       {/* Quick links */}
       <div className="xl:col-span-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <GradientMini title="Create complaint" href="/complaints/new" />
+        <GradientMini title="Check complaints" href="/complaints" />
         <GradientMini title="Browse contacts" href="/agency-contacts" variant="alt" />
         <GradientMini title="Upload circular" disabled />
         <GradientMini title="View reports" variant="alt" disabled />
