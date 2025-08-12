@@ -3,6 +3,7 @@
 import useSWR from 'swr';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,7 +54,8 @@ function useGreeting(): Greeting {
 
 function useOverview() {
   const { data, error, isLoading } = useSWR<Overview>('/api/stats/overview', fetcher, { revalidateOnFocus: false });
-  const { data: usersData } = useSWR<{ users: any[]; pagination?: { totalUsers?: number } }>(
+  type UsersCount = { users: unknown[]; pagination?: { totalUsers?: number } };
+  const { data: usersData } = useSWR<UsersCount>(
     ['/api/users', 'count'],
     () => api.get('/api/users', { params: { page: 1, limit: 1 } }).then((r) => r.data),
     { revalidateOnFocus: false }
@@ -200,7 +202,7 @@ export default function DashboardPage() {
 
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button size="sm" variant="secondary" asChild>
-                  <a href="/complaints">View Open Complaints</a>
+                  <Link href="/complaints">View Open Complaints</Link>
                 </Button>
                 <Button size="sm" variant="ghost" className="text-inherit" asChild>
                   <a href="/agency-contacts">Add Contact</a>
@@ -232,16 +234,16 @@ export default function DashboardPage() {
                 <div key={i} className="flex items-center justify-between">
                   <Skeleton className="h-4 w-28" />
                   <Skeleton className="h-5 w-10 rounded-md" />
-                </div>
+          </div>
               ))}
               <Skeleton className="h-3 w-64" />
-            </div>
+          </div>
           ) : (
             <>
               <RowStat label="Open" value={overview?.complaints?.open} badgeVariant="default" />
               <RowStat label="In progress" value={overview?.complaints?.inProgress} badgeVariant="secondary" />
               <RowStat label="Resolved (7d)" value={overview?.complaints?.resolved7d} badgeVariant="outline" />
-              <p className="text-xs text-muted-foreground">Hook to real stats once endpoints are ready.</p>
+          <p className="text-xs text-muted-foreground">Hook to real stats once endpoints are ready.</p>
             </>
           )}
         </CardContent>
@@ -279,8 +281,8 @@ export default function DashboardPage() {
 function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
   const style = {
     // Subtle gradient tuned against foreground readability
-    ['--grad-from' as any]: 'color-mix(in oklch, var(--primary) 70%, oklch(1 0 0))',
-    ['--grad-to' as any]: 'color-mix(in oklch, var(--accent) 35%, var(--primary))',
+    ['--grad-from' as unknown as string]: 'color-mix(in oklch, var(--primary) 70%, oklch(1 0 0))',
+    ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--accent) 35%, var(--primary))',
   } as React.CSSProperties;
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -297,8 +299,8 @@ function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
 function GradientMini({ title, href, variant = 'base', disabled = false }: { title: string; href?: string; variant?: 'base' | 'alt'; disabled?: boolean }) {
   const style =
     variant === 'base'
-      ? ({ ['--grad-from' as any]: 'var(--primary)', ['--grad-to' as any]: 'color-mix(in oklch, var(--primary) 40%, var(--accent))' } as React.CSSProperties)
-      : ({ ['--grad-from' as any]: 'var(--accent)', ['--grad-to' as any]: 'color-mix(in oklch, var(--accent) 40%, var(--primary))' } as React.CSSProperties);
+      ? ({ ['--grad-from' as unknown as string]: 'var(--primary)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--primary) 40%, var(--accent))' } as React.CSSProperties)
+      : ({ ['--grad-from' as unknown as string]: 'var(--accent)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--accent) 40%, var(--primary))' } as React.CSSProperties);
   if (disabled) {
     return (
       <motion.div style={style} whileHover={{ scale: 1.01 }} className="relative block rounded-xl p-[1px] cursor-not-allowed opacity-80" aria-disabled>
@@ -330,10 +332,10 @@ function GradientMini({ title, href, variant = 'base', disabled = false }: { tit
 function StatsTile({ label, value, loading, tone = 'base' }: { label: string; value?: number; loading?: boolean; tone?: 'base' | 'alt' | 'warn' }) {
   const style =
     tone === 'base'
-      ? ({ ['--grad-from' as any]: 'var(--primary)', ['--grad-to' as any]: 'color-mix(in oklch, var(--primary) 40%, var(--accent))' } as React.CSSProperties)
+      ? ({ ['--grad-from' as unknown as string]: 'var(--primary)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--primary) 40%, var(--accent))' } as React.CSSProperties)
       : tone === 'alt'
-      ? ({ ['--grad-from' as any]: 'var(--accent)', ['--grad-to' as any]: 'color-mix(in oklch, var(--accent) 40%, var(--primary))' } as React.CSSProperties)
-      : ({ ['--grad-from' as any]: 'var(--destructive)', ['--grad-to' as any]: 'color-mix(in oklch, var(--destructive) 30%, var(--primary))' } as React.CSSProperties);
+      ? ({ ['--grad-from' as unknown as string]: 'var(--accent)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--accent) 40%, var(--primary))' } as React.CSSProperties)
+      : ({ ['--grad-from' as unknown as string]: 'var(--destructive)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--destructive) 30%, var(--primary))' } as React.CSSProperties);
 
   return (
     <div className="rounded-xl p-[1px]" style={style}>

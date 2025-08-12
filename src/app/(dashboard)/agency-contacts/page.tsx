@@ -34,7 +34,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AgencyContactForm } from "@/components/forms/AgencyContactForm";
@@ -56,11 +55,8 @@ export default function AgencyContactsPage() {
 
   const contacts: AgencyContact[] = data?.contacts ?? [];
 
-  const onCreate = async (values: Parameters<typeof AgencyContactForm>[0]["onSubmit"] extends (
-    v: infer V
-  ) => any
-    ? V
-    : never) => {
+  type AgencyFormValues = Parameters<typeof AgencyContactForm>[0]["onSubmit"] extends (v: infer V) => unknown ? V : never;
+  const onCreate = async (values: AgencyFormValues) => {
     setSubmitting(true);
     try {
       const payload: AgencyContactPayload = {

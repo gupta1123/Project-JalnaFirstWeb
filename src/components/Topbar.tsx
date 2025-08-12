@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAccent } from "@/hooks/use-accent";
+import { useAccent, Accent } from "@/hooks/use-accent";
 import { usePathname } from "next/navigation";
 
 export function Topbar() {
@@ -24,7 +24,7 @@ export function Topbar() {
       </div>
       <div className="flex items-center gap-3">
         {/* Accent */}
-        <Select value={accent} onValueChange={(v) => setAccent(v as any)}>
+        <Select value={accent} onValueChange={(v) => setAccent(v as Accent)}>
           <SelectTrigger aria-label="Accent" className="w-[130px]">
             <SelectValue placeholder="Accent" />
           </SelectTrigger>

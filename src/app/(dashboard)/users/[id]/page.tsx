@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,9 +132,10 @@ const mapsLink = (c?: Coordinates, city?: string) => {
 };
 
 /* -------------------- Page -------------------- */
-export default function UserDetailPage({ userId, initialData }: { userId?: string; initialData?: UserResponse }) {
-  const key = userId ? `/api/users/${userId}` : '/api/users/me';
-  const { data, isLoading } = useSWR<UserResponse>(key, fetcher, { fallbackData: initialData });
+export default function UserDetailPage() {
+  const params = useParams<{ id: string }>();
+  const userId = params?.id as string;
+  const { data, isLoading } = useSWR<UserResponse>(userId ? `/api/users/${userId}` : null, fetcher);
   const user = data?.user;
 
   const fullName = useMemo(() => user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User', [user]);
@@ -240,8 +242,8 @@ export default function UserDetailPage({ userId, initialData }: { userId?: strin
 /* -------------------- Subcomponents -------------------- */
 function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
   const style = {
-    ['--grad-from' as any]: 'var(--primary)',
-    ['--grad-to' as any]: 'color-mix(in oklch, var(--primary) 45%, var(--accent))',
+    ['--grad-from' as unknown as string]: 'var(--primary)',
+    ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--primary) 45%, var(--accent))',
   } as React.CSSProperties;
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -300,7 +302,7 @@ function PrivilegesGrid({ data }: { data?: User['adminPrivileges'] }) {
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {rows.map((r) => {
-        const ok = (data as any)?.[r.key] as boolean | undefined;
+        const ok = (data && typeof data === 'object' ? (data as Record<string, unknown>)[r.key] : undefined) as boolean | undefined;
         return (
           <div key={r.key} className="flex items-center justify-between rounded-lg border p-3">
             <span className="text-sm">{r.label}</span>
