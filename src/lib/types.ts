@@ -15,6 +15,7 @@ export type User = {
   phoneNumber?: string;
   role: "user" | "admin" | "superadmin";
   profilePhoto?: string | null;
+  profilePhotoUrl?: string | null;
   isEmailVerified: boolean;
   isActive: boolean;
   isBlocked: boolean;

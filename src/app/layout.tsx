@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   },
   applicationName: "Jalna First",
   description: "Jalna First Admin Panel",
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

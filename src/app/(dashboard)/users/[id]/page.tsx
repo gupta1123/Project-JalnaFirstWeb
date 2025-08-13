@@ -44,6 +44,7 @@ type User = {
   createdAt?: string;
   lastActive?: string;
   profilePhoto?: string; // can be file name or URL
+  profilePhotoUrl?: string; // absolute URL from backend
   aadhaarNumber?: string;
   education?: string;
   occupation?: string;
@@ -74,11 +75,11 @@ type User = {
 type UserResponse = { message?: string; user?: User };
 
 /* -------------------- Helpers -------------------- */
-const resolveProfileUrl = (p?: string) => {
-  if (!p) return '';
-  if (/^https?:\/\//i.test(p)) return p;
-  // Adjust base path if your files live elsewhere
-  return `/uploads/${p}`;
+const resolveProfileUrl = (primary?: string, fallback?: string) => {
+  const pick = primary || fallback;
+  if (!pick) return '';
+  if (/^https?:\/\//i.test(pick)) return pick;
+  return `/uploads/${pick}`;
 };
 
 const initials = (u?: User) => {
@@ -154,7 +155,7 @@ export default function UserDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-primary-foreground">
             <div className="flex items-center gap-4">
               <Avatar className="h-14 w-14 ring-2 ring-foreground/20 bg-background/60 backdrop-blur">
-                <AvatarImage src={resolveProfileUrl(user?.profilePhoto)} alt={fullName} />
+                <AvatarImage src={resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto)} alt={fullName} />
                 <AvatarFallback className="text-primary-foreground bg-foreground/10">{initials(user)}</AvatarFallback>
               </Avatar>
               <div>
