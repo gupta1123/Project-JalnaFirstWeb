@@ -13,10 +13,12 @@ import { adminGetTickets } from "@/lib/api";
 import type { Ticket } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { formatDateTimeSmart } from "@/lib/utils";
 
 export default function ComplaintsPage() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>("all");
+  const [status, setStatus] = useState<string>("open");
   const [category, setCategory] = useState<string>("");
   const [priority, setPriority] = useState<string>("");
   const params = useMemo(() => {
@@ -73,7 +75,7 @@ export default function ComplaintsPage() {
           </Select>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => { setSearch(""); setStatus(""); setCategory(""); setPriority(""); }}>Reset</Button>
+          <Button variant="secondary" onClick={() => { setSearch(""); setStatus("open"); setCategory(""); setPriority(""); }}>Reset</Button>
           <Button onClick={() => mutate()}>Apply</Button>
         </div>
         <div className="rounded-md border">
@@ -110,8 +112,12 @@ export default function ComplaintsPage() {
                 <TableRow key={t._id}>
                   <TableCell><Link className="underline" href={`/complaints/${t._id}`}>{t.ticketNumber ?? t._id}</Link></TableCell>
                   <TableCell>{t.title}</TableCell>
-                  <TableCell className="capitalize">{t.category ?? '-'}</TableCell>
-                  <TableCell className="capitalize">{t.priority ?? '-'}</TableCell>
+                  <TableCell className="capitalize">
+                    {t.category ? <Badge variant="secondary" className="capitalize">{t.category}</Badge> : '-'}
+                  </TableCell>
+                  <TableCell className="capitalize">
+                    {t.priority ? <Badge className="capitalize">{t.priority}</Badge> : '-'}
+                  </TableCell>
                   <TableCell className="capitalize">
                     <span className={
                       t.status === 'open' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
@@ -120,7 +126,7 @@ export default function ComplaintsPage() {
                       'rounded px-2 py-0.5 text-xs bg-muted text-muted-foreground'
                     }>{t.status.replace(/_/g, ' ')}</span>
                   </TableCell>
-                  <TableCell>{t.createdAt ? new Date(t.createdAt).toLocaleString() : '-'}</TableCell>
+                  <TableCell>{formatDateTimeSmart(t.createdAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

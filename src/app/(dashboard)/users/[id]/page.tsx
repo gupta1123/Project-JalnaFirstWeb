@@ -91,12 +91,7 @@ const initials = (u?: User) => {
     .join('') || 'U';
 };
 
-const maskAadhaar = (v?: string) => {
-  if (!v) return '—';
-  const digits = v.replace(/\D/g, '');
-  const last4 = digits.slice(-4);
-  return `XXXX-XXXX-${last4}`;
-};
+// Aadhaar shown in full per request
 
 const fmtDate = (iso?: string) =>
   iso
@@ -193,7 +188,7 @@ export default function UserDetailPage() {
           <InfoItem icon={<Shield className="h-4 w-4" />} label="Email verified" value={user?.isEmailVerified ? 'Yes' : 'No'} chip />
           <InfoItem icon={<CalendarClock className="h-4 w-4" />} label="Joined" value={fmtDate(user?.createdAt)} helper={relativeTime(user?.createdAt)} />
           
-           <InfoItem icon={<Shield className="h-4 w-4" />} label="Aadhaar" value={maskAadhaar(user?.aadhaarNumber)} />
+           <InfoItem icon={<Shield className="h-4 w-4" />} label="Aadhaar" value={user?.aadhaarNumber ?? '—'} />
         </CardContent>
       </Card>
 
@@ -335,6 +330,6 @@ function formatAddress(a?: User['address']) {
 
 function formatAddressLines(a?: User['address']) {
   if (!a) return '';
-  const line = [a.line1, a.line2].filter(Boolean).join(', ');
-  return line;
+  const parts = [a.line1, a.line2, a.city];
+  return parts.filter(Boolean).join(', ');
 }

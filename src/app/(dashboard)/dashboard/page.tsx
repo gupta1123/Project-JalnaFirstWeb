@@ -4,11 +4,12 @@ import useSWR from 'swr';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { formatDateTimeSmart } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api, adminGetTickets } from '@/lib/api';
+import { api, adminGetTicketStats } from '@/lib/api';
 // removed charts
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
@@ -90,28 +91,17 @@ function useOverview() {
 
 /* -------------------- Ticket stats (admin) -------------------- */
 function useTicketStats() {
-  type Count = number;
-  const { data: open } = useSWR<Count>(['tickets-count', 'open'], async () => {
-    const r = await adminGetTickets({ status: 'open', page: 1, limit: 1 });
-    return r.pagination?.totalTickets ?? 0;
-  }, { revalidateOnFocus: false });
-  const { data: inProgress } = useSWR<Count>(['tickets-count', 'in_progress'], async () => {
-    const r = await adminGetTickets({ status: 'in_progress', page: 1, limit: 1 });
-    return r.pagination?.totalTickets ?? 0;
-  }, { revalidateOnFocus: false });
-  const { data: resolved } = useSWR<Count>(['tickets-count', 'resolved'], async () => {
-    const r = await adminGetTickets({ status: 'resolved', page: 1, limit: 1 });
-    return r.pagination?.totalTickets ?? 0;
-  }, { revalidateOnFocus: false });
-  const { data: closed } = useSWR<Count>(['tickets-count', 'closed'], async () => {
-    const r = await adminGetTickets({ status: 'closed', page: 1, limit: 1 });
-    return r.pagination?.totalTickets ?? 0;
-  }, { revalidateOnFocus: false });
-
-  const loading = open == null || inProgress == null || resolved == null || closed == null;
+  const { data, isLoading } = useSWR(['tickets-admin-stats'], adminGetTicketStats, { revalidateOnFocus: false });
+  const overall = data?.overall ?? {};
   return {
-    counts: { open: open ?? 0, inProgress: inProgress ?? 0, resolved: resolved ?? 0, closed: closed ?? 0 },
-    isLoading: loading,
+    counts: {
+      open: overall.open ?? 0,
+      inProgress: overall.inProgress ?? 0,
+      resolved: overall.resolved ?? 0,
+      closed: overall.closed ?? 0,
+    },
+    isLoading,
+    raw: data,
   } as const;
 }
 
@@ -202,10 +192,9 @@ export default function DashboardPage() {
   const quote = useQuote();
   const { data: overview, isLoading: loadingOverview } = useOverview();
   const { counts: ticketCounts, isLoading: loadingTickets } = useTicketStats();
+  // Stats are already fetched by useTicketStats
 
-  const today = useMemo(() =>
-    new Intl.DateTimeFormat('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }).format(new Date()),
-  []);
+  const today = useMemo(() => formatDateTimeSmart(new Date()), []);
 
   return (
       <div className="grid gap-6 xl:grid-cols-3 items-stretch">

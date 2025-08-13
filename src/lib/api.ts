@@ -26,6 +26,10 @@ export function setAuthToken(token: string | null) {
   else Cookies.remove("ss_token");
 }
 
+export function clearAuthToken() {
+  Cookies.remove("ss_token");
+}
+
 export type LoginPayload = { email: string; password: string };
 export async function login(payload: LoginPayload): Promise<{ message: string; token: string; user: User }>{
   const res = await api.post("/api/auth/login", payload);
@@ -277,4 +281,15 @@ export async function adminAddNote(id: string, note: string) {
 }
 
 // TODO: Notices/Circulars endpoints are not in the doc. Add once available.
+
+// Tickets admin stats
+export type TicketStats = {
+  overall?: { total?: number; open?: number; inProgress?: number; resolved?: number; closed?: number };
+  byCategory?: Array<{ _id: string; count: number }>;
+  byPriority?: Array<{ _id: string; count: number }>;
+};
+export async function adminGetTicketStats(): Promise<TicketStats> {
+  const res = await api.get("/api/tickets/admin/stats");
+  return res.data as TicketStats;
+}
 

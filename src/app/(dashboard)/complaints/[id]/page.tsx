@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarClock, Hash, Tag, Flag, User, MapPin, Clipboard } from "lucide-react";
+import { formatDateTimeSmart } from "@/lib/utils";
 import type { Ticket, TicketStatus } from "@/lib/types";
 import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote } from "@/lib/api";
 import { useMemo, useState } from "react";
@@ -27,8 +28,8 @@ export default function ComplaintDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
-  const created = useMemo(() => (ticket?.createdAt ? new Date(ticket.createdAt).toLocaleString() : "-"), [ticket?.createdAt]);
-  const updated = useMemo(() => (ticket?.updatedAt ? new Date(ticket.updatedAt).toLocaleString() : "-"), [ticket?.updatedAt]);
+  const created = useMemo(() => formatDateTimeSmart(ticket?.createdAt), [ticket?.createdAt]);
+  const updated = useMemo(() => formatDateTimeSmart(ticket?.updatedAt), [ticket?.updatedAt]);
 
   function statusBadgeClass(s: TicketStatus) {
     if (s === "open") return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";

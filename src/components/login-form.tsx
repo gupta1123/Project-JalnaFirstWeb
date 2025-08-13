@@ -57,12 +57,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="grid gap-3">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <a href="#" className="ml-auto text-sm underline-offset-2 hover:underline">
-                    Forgot your password?
-                  </a>
-                </div>
+                <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
@@ -72,7 +67,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="Jalna First" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale" />
+            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="Jalna First" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.25] dark:grayscale" />
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="backdrop-blur-[2px] bg-background/40 dark:bg-black/30 rounded-md px-4 py-2 shadow-sm">
+                <div className="text-xl font-semibold tracking-tight">Jalna First</div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
