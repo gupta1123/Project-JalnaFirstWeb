@@ -79,6 +79,7 @@ export type Complaint = {
 
 // Tickets (new API)
 export type TicketCategory =
+  // Legacy/previous categories (still allowed from backend)
   | "complaint"
   | "support"
   | "bug"
@@ -86,6 +87,21 @@ export type TicketCategory =
   | "general"
   | "technical"
   | "billing"
+  // New municipal categories
+  | "sanitation"
+  | "water_supply"
+  | "electricity"
+  | "roads"
+  | "streetlights"
+  | "drainage"
+  | "public_safety"
+  | "healthcare"
+  | "education"
+  | "transport"
+  | "municipal_services"
+  | "pollution"
+  | "encroachment"
+  | "property_tax_billing"
   | "other";
 
 export type TicketPriority = "low" | "medium" | "high" | "urgent";

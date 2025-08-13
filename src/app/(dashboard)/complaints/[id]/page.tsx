@@ -2,15 +2,16 @@
 
 import useSWR from "swr";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarClock, Hash, Tag, Flag, User, MapPin, Clipboard } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
-import type { Ticket, TicketStatus } from "@/lib/types";
-import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote } from "@/lib/api";
+import type { Ticket, TicketStatus, User } from "@/lib/types";
+import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, getUserById } from "@/lib/api";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +23,24 @@ export default function ComplaintDetailPage() {
   const id = params?.id as string;
   const { data, isLoading, mutate } = useSWR(id ? ["ticket-admin", id] : null, () => adminGetTicketById(id));
   const ticket = data as Ticket | undefined;
+
+  const requesterUserId = useMemo(() => {
+    const createdBy = ticket?.createdBy as unknown;
+    if (!createdBy) return undefined;
+    if (typeof createdBy === "string") return createdBy;
+    if (typeof createdBy === "object") {
+      const obj = createdBy as Record<string, unknown>;
+      return (obj._id as string) ?? (obj.id as string) ?? undefined;
+    }
+    return undefined;
+  }, [ticket]);
+
+  const { data: requester, isLoading: isLoadingRequester } = useSWR(
+    requesterUserId ? ["user", requesterUserId] : null,
+    () => getUserById(requesterUserId as string),
+    { revalidateOnFocus: false }
+  );
+  const requesterUser = requester as User | undefined;
 
   const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? "open");
   const [note, setNote] = useState<string>("");
@@ -76,7 +95,7 @@ export default function ComplaintDetailPage() {
       <CardHeader>
         <CardTitle>Ticket</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className="grid gap-4 overflow-x-hidden">
         {isLoading && (
           <div className="grid gap-3">
             <Skeleton className="h-4 w-64" />
@@ -88,7 +107,7 @@ export default function ComplaintDetailPage() {
         {!isLoading && ticket && (
           <div className="grid gap-4">
             {/* Top summary */}
-            <div className="rounded-lg border p-4 grid gap-3">
+            <div className="rounded-lg border p-4 grid gap-3 overflow-x-hidden">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Hash className="size-4 text-muted-foreground" />
@@ -107,8 +126,8 @@ export default function ComplaintDetailPage() {
                   <Badge className={`capitalize border ${statusBadgeClass(ticket.status)}`}>{ticket.status.replace(/_/g, " ")}</Badge>
                 </div>
               </div>
-              <div className="text-base font-medium">{ticket.title}</div>
-              <div className="text-sm text-muted-foreground leading-relaxed">{ticket.description}</div>
+              <div className="text-base font-medium break-words break-all whitespace-pre-wrap">{ticket.title}</div>
+              <div className="text-sm text-muted-foreground leading-relaxed break-words break-all whitespace-pre-wrap">{ticket.description}</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="size-3.5" /> Created: {created} • Updated: {updated}</div>
               {ticket.tags && ticket.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
@@ -143,20 +162,52 @@ export default function ComplaintDetailPage() {
               </div>
             </div>
 
-            {/* Requester & Location */}
+            {/* Requester & Address */}
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border p-4 grid gap-1">
-                <div className="text-sm font-medium mb-1 flex items-center gap-2"><User className="size-4 text-muted-foreground" /> Requester</div>
-                <div className="text-sm">{typeof ticket.createdBy === 'object' && ticket.createdBy && 'fullName' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).fullName as string : '-'}</div>
-                <div className="text-xs text-muted-foreground">
-                  {typeof ticket.createdBy === 'object' && ticket.createdBy && 'email' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).email as string : ''}
-                </div>
+                <div className="text-sm font-medium mb-1 flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /> Requester</div>
+                {requesterUserId ? (
+                  <Link href={`/users/${requesterUserId}`} className="text-sm underline underline-offset-2 hover:text-accent-foreground">
+                    {requesterUser?.fullName ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'fullName' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).fullName as string : '-')}
+                  </Link>
+                ) : (
+                  <div className="text-sm">{requesterUser?.fullName ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'fullName' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).fullName as string : '-')}</div>
+                )}
+                <div className="text-xs text-muted-foreground">{requesterUser?.email ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'email' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).email as string : '')}</div>
+                {requesterUser?.phoneNumber && (
+                  <div className="text-xs text-muted-foreground">{requesterUser.phoneNumber}</div>
+                )}
               </div>
               <div className="rounded-lg border p-4 grid gap-1">
-                <div className="text-sm font-medium mb-1 flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /> Location</div>
-                <div className="text-sm text-muted-foreground">Zone: {ticket.location?.zone ?? '-'}</div>
-                <div className="text-sm text-muted-foreground">City: {ticket.location?.city ?? '-'}</div>
-                <div className="text-sm text-muted-foreground">State: {ticket.location?.state ?? '-'}</div>
+                <div className="text-sm font-medium mb-1 flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /> Address</div>
+                {requesterUser?.address ? (
+                  <div className="text-sm text-muted-foreground space-y-0.5">
+                    {(() => {
+                      const addr = requesterUser.address!;
+                      const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+                      const city = addr.city?.trim();
+                      const lineHasCity = (line?: string) => !!(line && city && line.toLowerCase().includes(city.toLowerCase()));
+                      // Append city only to line1 if missing; never append to line2 to avoid duplicate city rows
+                      const line1Text = addr.line1 ? `${addr.line1}${!lineHasCity(addr.line1) && city ? `, ${city}` : ''}` : undefined;
+                      const line2Raw = addr.line2 ? `${addr.line2}` : undefined;
+                      const showLine2 = line1Text && line2Raw ? normalize(line1Text) !== normalize(line2Raw) : Boolean(line2Raw);
+                      const tail = [addr.state, addr.zipCode, addr.country].filter(Boolean).join(", ");
+                      return (
+                        <>
+                          {line1Text && <div>{line1Text}</div>}
+                          {showLine2 && <div>{line2Raw}</div>}
+                          {tail ? <div>{tail}</div> : (!line1Text && !showLine2 ? <div>-</div> : null)}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    <div>Zone: {ticket.location?.zone ?? '-'}</div>
+                    <div>City: {ticket.location?.city ?? '-'}</div>
+                    <div>State: {ticket.location?.state ?? '-'}</div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -164,9 +215,7 @@ export default function ComplaintDetailPage() {
             <div className="rounded-lg border p-4 grid gap-2">
               <div className="text-sm font-medium">Meta</div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant={ticket.escalated ? 'destructive' : 'outline'}>Escalated: {ticket.escalated ? 'Yes' : 'No'}</Badge>
                 <Badge variant={ticket.slaBreached ? 'destructive' : 'outline'}>SLA Breached: {ticket.slaBreached ? 'Yes' : 'No'}</Badge>
-                <Badge variant={ticket.isPublic ? 'secondary' : 'outline'}>Public: {ticket.isPublic ? 'Yes' : 'No'}</Badge>
                 {typeof ticket.age === 'number' && <Badge variant="outline">Age: {ticket.age}</Badge>}
               </div>
               <div className="text-xs text-muted-foreground">Updated: {updated}</div>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Complaint } from "@/lib/types";
 import { adminGetTickets } from "@/lib/api";
@@ -17,29 +18,32 @@ import { Badge } from "@/components/ui/badge";
 import { formatDateTimeSmart } from "@/lib/utils";
 
 export default function ComplaintsPage() {
+  const [page, setPage] = useState(1);
+  const [limit] = useState(15);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("open");
   const [category, setCategory] = useState<string>("");
   const [priority, setPriority] = useState<string>("");
   const params = useMemo(() => {
     const allowed = new Set(["open", "in_progress", "resolved", "closed"]);
-    const p: Record<string, string | number> = { page: 1, limit: 20, sortBy: "createdAt", sortOrder: "desc" };
+    const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
     if (search && search.trim()) p.search = search.trim();
     if (status && allowed.has(status)) p.status = status;
     if (category && category !== "all") p.category = category;
     if (priority && priority !== "all") p.priority = priority;
     return p;
-  }, [search, status, category, priority]);
+  }, [page, limit, search, status, category, priority]);
 
   const { data, isLoading, mutate } = useSWR(["tickets-admin", params], () => adminGetTickets(params));
   const tickets: Ticket[] = data?.tickets ?? [];
+  const pagination = data?.pagination;
 
   return (
     <Card>
       <CardContent className="grid gap-4">
         <div className="grid gap-2 sm:grid-cols-4">
-          <Input placeholder="Search title/description/number…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Select value={status} onValueChange={(v) => setStatus(v)}>
+          <Input placeholder="Search title/description/number…" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+          <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All status</SelectItem>
@@ -49,21 +53,28 @@ export default function ComplaintsPage() {
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={category} onValueChange={(v) => setCategory(v)}>
+          <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
             <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All categories</SelectItem>
-              <SelectItem value="technical">Technical</SelectItem>
-              <SelectItem value="support">Support</SelectItem>
-              <SelectItem value="bug">Bug</SelectItem>
-              <SelectItem value="feature_request">Feature</SelectItem>
-              <SelectItem value="billing">Billing</SelectItem>
-              <SelectItem value="complaint">Complaint</SelectItem>
-              <SelectItem value="general">General</SelectItem>
+              <SelectItem value="sanitation">Sanitation</SelectItem>
+              <SelectItem value="water_supply">Water Supply</SelectItem>
+              <SelectItem value="electricity">Electricity</SelectItem>
+              <SelectItem value="roads">Roads</SelectItem>
+              <SelectItem value="streetlights">Streetlights</SelectItem>
+              <SelectItem value="drainage">Drainage</SelectItem>
+              <SelectItem value="public_safety">Public Safety</SelectItem>
+              <SelectItem value="healthcare">Healthcare</SelectItem>
+              <SelectItem value="education">Education</SelectItem>
+              <SelectItem value="transport">Transport</SelectItem>
+              <SelectItem value="municipal_services">Municipal Services</SelectItem>
+              <SelectItem value="pollution">Pollution</SelectItem>
+              <SelectItem value="encroachment">Encroachment</SelectItem>
+              <SelectItem value="property_tax_billing">Property Tax/Billing</SelectItem>
               <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={priority} onValueChange={(v) => setPriority(v)}>
+          <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
             <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All priorities</SelectItem>
@@ -75,10 +86,10 @@ export default function ComplaintsPage() {
           </Select>
         </div>
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => { setSearch(""); setStatus("open"); setCategory(""); setPriority(""); }}>Reset</Button>
+          <Button variant="secondary" onClick={() => { setPage(1); setSearch(""); setStatus("open"); setCategory(""); setPriority(""); }}>Reset</Button>
           <Button onClick={() => mutate()}>Apply</Button>
         </div>
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -111,7 +122,9 @@ export default function ComplaintsPage() {
               {tickets.map((t) => (
                 <TableRow key={t._id}>
                   <TableCell><Link className="underline" href={`/complaints/${t._id}`}>{t.ticketNumber ?? t._id}</Link></TableCell>
-                  <TableCell>{t.title}</TableCell>
+                  <TableCell>
+                    <span className="block max-w-[420px] truncate" title={t.title}>{t.title}</span>
+                  </TableCell>
                   <TableCell className="capitalize">
                     {t.category ? <Badge variant="secondary" className="capitalize">{t.category}</Badge> : '-'}
                   </TableCell>
@@ -148,6 +161,21 @@ export default function ComplaintsPage() {
             </TableBody>
           </Table>
         </div>
+        {pagination && (
+          <Pagination className="pt-2">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (pagination.hasPrevPage) setPage((p) => Math.max(1, p - 1)); }} />
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationLink href="#" isActive>{pagination.currentPage}</PaginationLink>
+              </PaginationItem>
+              <PaginationItem>
+                <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (pagination.hasNextPage) setPage((p) => p + 1); }} />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        )}
       </CardContent>
     </Card>
   );
