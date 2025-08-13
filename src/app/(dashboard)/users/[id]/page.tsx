@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
+import Image from 'next/image';
 import {
   Mail,
   Phone,
@@ -154,10 +156,35 @@ export default function UserDetailPage() {
         <AnimatedGradientHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-primary-foreground">
             <div className="flex items-center gap-4">
-              <Avatar className="h-14 w-14 ring-2 ring-foreground/20 bg-background/60 backdrop-blur">
-                <AvatarImage src={resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto)} alt={fullName} />
-                <AvatarFallback className="text-primary-foreground bg-foreground/10">{initials(user)}</AvatarFallback>
-              </Avatar>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" aria-label="Open profile photo" className="rounded-full">
+                    <Avatar className="h-14 w-14 ring-2 ring-foreground/20 bg-background/60 backdrop-blur">
+                      <AvatarImage src={resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto)} alt={fullName} />
+                      <AvatarFallback className="text-primary-foreground bg-foreground/10">{initials(user)}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[520px]">
+                  <DialogHeader>
+                    <DialogTitle className="sr-only">Profile photo</DialogTitle>
+                  </DialogHeader>
+                  {(() => {
+                    const url = resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto);
+                    return url ? (
+                      <div className="flex items-center justify-center">
+                        <Image src={url} alt={fullName} width={480} height={480} className="rounded-lg object-cover" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center p-10">
+                        <Avatar className="h-40 w-40">
+                          <AvatarFallback className="text-4xl">{initials(user)}</AvatarFallback>
+                        </Avatar>
+                      </div>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
               <div>
                 <div className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
                   <UserRound className="h-5 w-5 opacity-90" /> {isLoading ? <Skeleton className="h-6 w-40" /> : fullName}

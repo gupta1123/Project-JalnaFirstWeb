@@ -116,14 +116,30 @@ export default function ComplaintsPage() {
                     {t.category ? <Badge variant="secondary" className="capitalize">{t.category}</Badge> : '-'}
                   </TableCell>
                   <TableCell className="capitalize">
-                    {t.priority ? <Badge className="capitalize">{t.priority}</Badge> : '-'}
+                    {t.priority ? (
+                      <span
+                        className={
+                          t.priority === 'low'
+                            ? 'rounded px-2 py-0.5 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                            : t.priority === 'medium'
+                            ? 'rounded px-2 py-0.5 text-xs bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            : t.priority === 'high'
+                            ? 'rounded px-2 py-0.5 text-xs bg-red-500/20 text-red-800 dark:text-red-300'
+                            : 'rounded px-2 py-0.5 text-xs bg-red-600/20 text-red-800 dark:text-red-300'
+                        }
+                      >
+                        {t.priority.replace(/_/g, ' ')}
+                      </span>
+                    ) : (
+                      '-'
+                    )}
                   </TableCell>
                   <TableCell className="capitalize">
                     <span className={
-                      t.status === 'open' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
-                      t.status === 'in_progress' ? 'rounded px-2 py-0.5 text-xs bg-blue-500/15 text-blue-700 dark:text-blue-300' :
+                      t.status === 'open' ? 'rounded px-2 py-0.5 text-xs bg-sky-500/15 text-sky-700 dark:text-sky-300' :
+                      t.status === 'in_progress' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
                       t.status === 'resolved' ? 'rounded px-2 py-0.5 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
-                      'rounded px-2 py-0.5 text-xs bg-muted text-muted-foreground'
+                      'rounded px-2 py-0.5 text-xs bg-neutral-500/15 text-neutral-700 dark:text-neutral-300'
                     }>{t.status.replace(/_/g, ' ')}</span>
                   </TableCell>
                   <TableCell>{formatDateTimeSmart(t.createdAt)}</TableCell>
