@@ -140,7 +140,7 @@ export default function AgencyContactsPage() {
                   <TableHead className="w-[28%]">Name & Designation</TableHead>
                   <TableHead className="w-[22%]">Agency</TableHead>
                   <TableHead className="w-[14%]">Type</TableHead>
-                  <TableHead className="w-[14%]">Zone/Area</TableHead>
+                  <TableHead className="w-[14%]">Area</TableHead>
                   <TableHead className="w-[16%]">Phone</TableHead>
                   <TableHead className="w-[6%] text-right">Actions</TableHead>
                 </TableRow>
@@ -188,8 +188,7 @@ export default function AgencyContactsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
-                        {c.zone}
-                        {c.area ? <span className="text-muted-foreground"> · {c.area}</span> : null}
+                        {c.area || "-"}
                       </div>
                     </TableCell>
                     <TableCell>
