@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import useSWR from 'swr';
 import { useEffect, useMemo, useState } from 'react';
@@ -191,10 +192,14 @@ export default function DashboardPage() {
   const greeting = useGreeting();
   const quote = useQuote();
   const { data: overview, isLoading: loadingOverview } = useOverview();
-  const { counts: ticketCounts, isLoading: loadingTickets } = useTicketStats();
+  const { counts: ticketCounts, isLoading: loadingTickets, raw: rawTicketStats } = useTicketStats();
   // Stats are already fetched by useTicketStats
 
-  const today = useMemo(() => formatDateTimeSmart(new Date()), []);
+  // Avoid hydration mismatch: compute on client after mount
+  const [today, setToday] = useState<string | null>(null);
+  useEffect(() => {
+    setToday(formatDateTimeSmart(new Date().toISOString()));
+  }, []);
 
   return (
       <div className="grid gap-6 xl:grid-cols-3 items-stretch">
@@ -212,7 +217,9 @@ export default function DashboardPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20">{today}</Badge>
+                <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20">
+                  <span suppressHydrationWarning>{today ?? ''}</span>
+                </Badge>
               </div>
 
               <p className="opacity-90 text-sm leading-relaxed max-w-prose">{quote}</p>
@@ -257,10 +264,12 @@ export default function DashboardPage() {
           </div>
           ) : (
             <>
+              <RowStat label="Total" value={rawTicketStats?.overall?.total ?? 0} badgeVariant="secondary" />
               <RowStat label="Open" value={ticketCounts.open} badgeVariant="default" />
               <RowStat label="In progress" value={ticketCounts.inProgress} badgeVariant="secondary" />
               <RowStat label="Resolved" value={ticketCounts.resolved} badgeVariant="outline" />
               <RowStat label="Closed" value={ticketCounts.closed} badgeVariant="outline" />
+              <div className="pt-1 text-xs text-muted-foreground">High priority: {rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0}</div>
             </>
           )}
         </CardContent>
@@ -271,6 +280,7 @@ export default function DashboardPage() {
         <StatsTile label="Total users" value={overview?.totalUsers} loading={loadingOverview} />
         <StatsTile label="New this week" value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
         <StatsTile label="Open complaints" value={ticketCounts.open} loading={loadingTickets} />
+        <StatsTile label="High priority" value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
       </div>
 
       {/* trends removed */}

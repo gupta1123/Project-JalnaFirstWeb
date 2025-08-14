@@ -260,6 +260,7 @@ export async function adminGetTickets(params?: {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  userId?: string;
 }): Promise<{ tickets: Ticket[]; pagination?: AdminPagination }> {
   const res = await api.get("/api/tickets/admin/all", { params });
   return res.data as { tickets: Ticket[]; pagination?: AdminPagination };
@@ -278,6 +279,12 @@ export async function adminUpdateTicketStatus(id: string, payload: { status?: Ti
 export async function adminAddNote(id: string, note: string) {
   const res = await api.post(`/api/tickets/admin/${id}/notes`, { note });
   return res.data as { message: string; adminNotes: Ticket["adminNotes"] };
+}
+
+// Ticket change history (admin)
+export async function adminGetTicketHistory(id: string) {
+  const res = await api.get(`/api/tickets/admin/${id}/history`);
+  return res.data;
 }
 
 // TODO: Notices/Circulars endpoints are not in the doc. Add once available.

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { api } from '@/lib/api';
+import { api, adminGetTickets } from '@/lib/api';
 import Image from 'next/image';
 import {
   Mail,
@@ -135,6 +135,9 @@ export default function UserDetailPage() {
   const userId = params?.id as string;
   const { data, isLoading } = useSWR<UserResponse>(userId ? `/api/users/${userId}` : null, fetcher);
   const user = data?.user;
+  // User tickets (admin)
+  const { data: ticketsData } = useSWR(user?._id ? ["user-tickets", user._id] : null, () => adminGetTickets({ page: 1, limit: 5, userId: user?._id }), { revalidateOnFocus: false });
+  const userTickets = (ticketsData?.tickets ?? []).slice(0, 5);
 
   const fullName = useMemo(() => user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User', [user]);
   const today = useMemo(
@@ -248,6 +251,43 @@ export default function UserDetailPage() {
       <Card>
         <CardContent className="space-y-3">
           <InfoRow icon={<Globe className="h-4 w-4" />} label="Preferred language" value={user?.preferredLanguage?.toUpperCase()} />
+        </CardContent>
+      </Card>
+
+      {/* Recent tickets */}
+      <Card className="lg:col-span-3">
+        <CardHeader className="pb-2"><CardTitle>Recent tickets</CardTitle></CardHeader>
+        <CardContent>
+          {userTickets.length === 0 ? (
+            <div className="text-sm text-muted-foreground">No tickets</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground">
+                  <tr className="text-left">
+                    <th className="py-2 pr-4">Number</th>
+                    <th className="py-2 pr-4">Title</th>
+                    <th className="py-2 pr-4">Category</th>
+                    <th className="py-2 pr-4">Priority</th>
+                    <th className="py-2 pr-4">Status</th>
+                    <th className="py-2 pr-0">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userTickets.map((t) => (
+                    <tr key={t._id} className="border-t">
+                      <td className="py-2 pr-4">{t.ticketNumber ?? t._id}</td>
+                      <td className="py-2 pr-4 max-w-[280px] truncate">{t.title}</td>
+                      <td className="py-2 pr-4 capitalize">{t.category}</td>
+                      <td className="py-2 pr-4"><Badge className="capitalize">{t.priority}</Badge></td>
+                      <td className="py-2 pr-4"><Badge variant="outline" className="capitalize">{t.status?.replace(/_/g, ' ')}</Badge></td>
+                      <td className="py-2 pr-0">{fmtDate(t.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
