@@ -41,53 +41,55 @@ export default function ComplaintsPage() {
   return (
     <Card>
       <CardContent className="grid gap-4">
-        <div className="grid gap-2 sm:grid-cols-4">
-          <Input placeholder="Search title/description/number…" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
-          <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
-            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="in_progress">In progress</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
-            <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              <SelectItem value="sanitation">Sanitation</SelectItem>
-              <SelectItem value="water_supply">Water Supply</SelectItem>
-              <SelectItem value="electricity">Electricity</SelectItem>
-              <SelectItem value="roads">Roads</SelectItem>
-              <SelectItem value="streetlights">Streetlights</SelectItem>
-              <SelectItem value="drainage">Drainage</SelectItem>
-              <SelectItem value="public_safety">Public Safety</SelectItem>
-              <SelectItem value="healthcare">Healthcare</SelectItem>
-              <SelectItem value="education">Education</SelectItem>
-              <SelectItem value="transport">Transport</SelectItem>
-              <SelectItem value="municipal_services">Municipal Services</SelectItem>
-              <SelectItem value="pollution">Pollution</SelectItem>
-              <SelectItem value="encroachment">Encroachment</SelectItem>
-              <SelectItem value="property_tax_billing">Property Tax/Billing</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
-            <SelectTrigger><SelectValue placeholder="Priority" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All priorities</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" onClick={() => { setPage(1); setSearch(""); setStatus("open"); setCategory(""); setPriority(""); }}>Reset</Button>
-          <Button onClick={() => mutate()}>Apply</Button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+          <div className="flex flex-1 flex-wrap gap-2">
+            <Input className="w-full sm:w-[360px]" placeholder="Search title/description/number…" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+            <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="in_progress">In progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                <SelectItem value="sanitation">Sanitation</SelectItem>
+                <SelectItem value="water_supply">Water Supply</SelectItem>
+                <SelectItem value="electricity">Electricity</SelectItem>
+                <SelectItem value="roads">Roads</SelectItem>
+                <SelectItem value="streetlights">Streetlights</SelectItem>
+                <SelectItem value="drainage">Drainage</SelectItem>
+                <SelectItem value="public_safety">Public Safety</SelectItem>
+                <SelectItem value="healthcare">Healthcare</SelectItem>
+                <SelectItem value="education">Education</SelectItem>
+                <SelectItem value="transport">Transport</SelectItem>
+                <SelectItem value="municipal_services">Municipal Services</SelectItem>
+                <SelectItem value="pollution">Pollution</SelectItem>
+                <SelectItem value="encroachment">Encroachment</SelectItem>
+                <SelectItem value="property_tax_billing">Property Tax/Billing</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Priority" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All priorities</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <Button variant="secondary" onClick={() => { setPage(1); setSearch(""); setStatus("open"); setCategory(""); setPriority(""); }}>Reset</Button>
+            <Button onClick={() => mutate()}>Apply</Button>
+          </div>
         </div>
         <div className="rounded-md border overflow-x-auto">
           <Table>
@@ -95,6 +97,7 @@ export default function ComplaintsPage() {
               <TableRow>
                 <TableHead>Ticket #</TableHead>
                 <TableHead>Title</TableHead>
+                <TableHead>Sender</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Priority</TableHead>
                 <TableHead>Status</TableHead>
@@ -108,6 +111,7 @@ export default function ComplaintsPage() {
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-64" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
@@ -117,13 +121,35 @@ export default function ComplaintsPage() {
                 </>
               )}
               {!isLoading && tickets.length === 0 && (
-                <TableRow><TableCell colSpan={4}>No complaints</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7}>No complaints</TableCell></TableRow>
               )}
               {tickets.map((t) => (
                 <TableRow key={t._id}>
                   <TableCell><Link className="underline" href={`/complaints/${t._id}`}>{t.ticketNumber ?? t._id}</Link></TableCell>
                   <TableCell>
                     <span className="block max-w-[420px] truncate" title={t.title}>{t.title}</span>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const cb = t.createdBy as unknown;
+                      let userId: string | undefined;
+                      let userName: string | undefined;
+                      if (typeof cb === 'string') {
+                        userId = cb;
+                        userName = 'View';
+                      } else if (cb && typeof cb === 'object') {
+                        const o = cb as Record<string, unknown>;
+                        userId = (o._id as string) ?? (o.id as string);
+                        userName = (o.fullName as string) ?? (o.email as string) ?? 'User';
+                      }
+                      return userId ? (
+                        <Link href={`/users/${userId}`} className="underline underline-offset-2">
+                          <span className="block max-w-[220px] truncate" title={userName}>{userName}</span>
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="capitalize">
                     {t.category ? <Badge variant="secondary" className="capitalize">{t.category}</Badge> : '-'}

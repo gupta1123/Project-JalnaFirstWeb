@@ -35,9 +35,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { AgencyContactForm } from "@/components/forms/AgencyContactForm";
-import { MoreVertical, Plus, Trash2 } from "lucide-react";
+import { MoreVertical, Plus, Trash2, Eye, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -45,6 +46,8 @@ export default function AgencyContactsPage() {
   const [search, setSearch] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState<null | string>(null);
+  const [isViewOpen, setIsViewOpen] = useState<null | string>(null);
+  const [isEditOpen, setIsEditOpen] = useState<null | string>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const { data, isLoading, mutate } = useSWR(
@@ -99,6 +102,31 @@ export default function AgencyContactsPage() {
       setSubmitting(false);
     }
   }
+
+  // Reuse AgencyFormValues defined above
+  const onUpdate = async (id: string, values: AgencyFormValues) => {
+    setSubmitting(true);
+    try {
+      const payload: Partial<AgencyContactPayload> = {
+        name: values.name,
+        designation: values.designation,
+        phoneNumbers: [{ number: values.phoneNumber, type: values.phoneType }],
+        agencyName: values.agencyName,
+        agencyType: values.agencyType,
+        zone: values.zone,
+        area: values.area,
+      };
+      const { updateAgencyContact } = await import("@/lib/api");
+      await updateAgencyContact(id, payload);
+      toast.success("Contact updated");
+      setIsEditOpen(null);
+      mutate();
+    } catch (e) {
+      toast.error("Update failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="grid gap-4">
@@ -204,9 +232,13 @@ export default function AgencyContactsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
-                          {/* Placeholder for future edit */}
-                          {/* <DropdownMenuItem onClick={() => {}}>Edit</DropdownMenuItem>
-                          <DropdownMenuSeparator /> */}
+                          <DropdownMenuItem onClick={() => setIsViewOpen(c._id)}>
+                            <Eye className="size-4" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setIsEditOpen(c._id)}>
+                            <Pencil className="size-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             variant="destructive"
                             onClick={() => setIsDeleteOpen(c._id)}
@@ -251,6 +283,68 @@ export default function AgencyContactsPage() {
               {submitting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* View contact dialog */}
+      <Dialog open={!!isViewOpen} onOpenChange={(open) => !open && setIsViewOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Contact details</DialogTitle>
+          </DialogHeader>
+          {isViewOpen && (
+            <div className="grid gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Name</div>
+                  <div className="font-medium">{contactById.get(isViewOpen)?.name}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Designation</div>
+                  <div>{contactById.get(isViewOpen)?.designation}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Agency</div>
+                  <div>{contactById.get(isViewOpen)?.agencyName}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Type</div>
+                  <div className="capitalize">{contactById.get(isViewOpen)?.agencyType}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">Zone</div>
+                  <div>{contactById.get(isViewOpen)?.zone}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Area</div>
+                  <div>{contactById.get(isViewOpen)?.area || '-'}</div>
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Phones</div>
+                <div>{contactById.get(isViewOpen)?.phoneNumbers?.map(p => p.number).join(', ')}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit contact dialog */}
+      <Dialog open={!!isEditOpen} onOpenChange={(open) => !open && setIsEditOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit contact</DialogTitle>
+          </DialogHeader>
+          {isEditOpen && (
+            <AgencyContactForm
+              initial={contactById.get(isEditOpen) ?? undefined}
+              submitting={submitting}
+              onSubmit={async (values) => onUpdate(isEditOpen, values)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

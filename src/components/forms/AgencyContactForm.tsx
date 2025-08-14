@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import type { AgencyContact } from "@/lib/types";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { User as UserIcon, Briefcase, Building2, MapPin, Phone } from "lucide-react";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -50,43 +53,58 @@ export function AgencyContactForm({
       onSubmit={async (e) => {
         e.preventDefault();
         const parsed = schema.safeParse(values);
-        if (!parsed.success) return;
+        if (!parsed.success) {
+          toast.error("Please fill all required fields correctly.");
+          return;
+        }
         await onSubmit(parsed.data);
       }}
     >
       <div className="grid gap-1">
-        <Label>Name</Label>
+        <Label className="flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /> Name</Label>
         <Input value={values.name} onChange={(e) => set("name", e.target.value)} required />
       </div>
       <div className="grid gap-1">
-        <Label>Designation</Label>
+        <Label className="flex items-center gap-2"><Briefcase className="size-4 text-muted-foreground" /> Designation</Label>
         <Input value={values.designation} onChange={(e) => set("designation", e.target.value)} required />
       </div>
       <div className="grid gap-1">
-        <Label>Agency Name</Label>
+        <Label className="flex items-center gap-2"><Building2 className="size-4 text-muted-foreground" /> Agency Name</Label>
         <Input value={values.agencyName} onChange={(e) => set("agencyName", e.target.value)} required />
       </div>
       <div className="grid gap-1">
-        <Label>Agency Type</Label>
-        <Input value={values.agencyType} onChange={(e) => set("agencyType", e.target.value as Values["agencyType"])} required />
+        <Label className="flex items-center gap-2"><Building2 className="size-4 text-muted-foreground" /> Agency Type</Label>
+        <Select value={values.agencyType} onValueChange={(v) => set("agencyType", v as Values["agencyType"]) }>
+          <SelectTrigger>
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="police">Police</SelectItem>
+            <SelectItem value="fire">Fire</SelectItem>
+            <SelectItem value="medical">Medical</SelectItem>
+            <SelectItem value="municipal">Municipal</SelectItem>
+            <SelectItem value="government">Government</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1">
-          <Label>Zone</Label>
+          <Label className="flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /> Zone</Label>
           <Input value={values.zone} onChange={(e) => set("zone", e.target.value)} required />
         </div>
         <div className="grid gap-1">
-          <Label>Area</Label>
+          <Label className="flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /> Area</Label>
           <Input value={values.area ?? ""} onChange={(e) => set("area", e.target.value)} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1">
-          <Label>Phone Number</Label>
+          <Label className="flex items-center gap-2"><Phone className="size-4 text-muted-foreground" /> Phone Number</Label>
           <Input value={values.phoneNumber} onChange={(e) => set("phoneNumber", e.target.value)} required />
         </div>
         <div className="grid gap-1">
-          <Label>Phone Type</Label>
+          <Label className="flex items-center gap-2"><Phone className="size-4 text-muted-foreground" /> Phone Type</Label>
           <Input value={values.phoneType} onChange={(e) => set("phoneType", e.target.value)} />
         </div>
       </div>
