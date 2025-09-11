@@ -290,128 +290,132 @@ export default function ComplaintDetailPage() {
             </div>
 
          
-            <div className="rounded-lg border p-4 grid gap-3">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium flex items-center gap-2">
-                  <Users className="size-4 text-muted-foreground" /> 
-                  Assigned Teams
-                </div>
-                {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="capitalize">
-                      {ticket.assignedTeams.length} team{ticket.assignedTeams.length !== 1 ? 's' : ''}
-                    </Badge>
+            {/* Teams and Location side by side */}
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Assigned Teams Card */}
+              <div className="rounded-lg border p-4 grid gap-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium flex items-center gap-2">
+                    <Users className="size-4 text-muted-foreground" /> 
+                    Assigned Teams
+                  </div>
+                  {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="capitalize">
+                        {ticket.assignedTeams.length} team{ticket.assignedTeams.length !== 1 ? 's' : ''}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAssignTeamsOpen(true)}
+                        disabled={submitting}
+                      >
+                        <Users className="size-3 mr-1" />
+                        Manage
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => setAssignTeamsOpen(true)}
                       disabled={submitting}
                     >
-                      <Users className="size-3 mr-1" />
-                      Manage
+                      <Plus className="size-3 mr-1" />
+                      Assign Teams
                     </Button>
+                  )}
+                </div>
+                
+                {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
+                  <div className="space-y-2">
+                    {ticket.assignedTeams.map((team) => (
+                      <div key={team._id} className="rounded border p-3 bg-muted/30">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="font-medium text-sm">{team.name}</div>
+                          <Badge variant="outline" className="text-xs">Active</Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {team.areas && team.areas.length > 0 ? (
+                            <div className="space-y-0.5">
+                              {team.areas.slice(0, 2).map((area, idx) => (
+                                <div key={idx} className="flex items-center gap-1">
+                                  <MapPin className="size-3" />
+                                  <span>{area.zone}, {area.city}</span>
+                                </div>
+                              ))}
+                              {team.areas.length > 2 && (
+                                <div className="text-xs opacity-70">+{team.areas.length - 2} more areas</div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="size-3" />
+                              <span>No specific areas</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAssignTeamsOpen(true)}
-                    disabled={submitting}
-                  >
-                    <Plus className="size-3 mr-1" />
-                    Assign Teams
-                  </Button>
+                  <div className="text-center py-6 text-sm text-muted-foreground">
+                    No teams assigned to this complaint
+                  </div>
                 )}
               </div>
-              
-              {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
-                <div className="grid gap-2 md:grid-cols-2">
-                  {ticket.assignedTeams.map((team) => (
-                    <div key={team._id} className="rounded border p-3 bg-muted/30">
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="font-medium text-sm">{team.name}</div>
-                        <Badge variant="outline" className="text-xs">Active</Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {team.areas && team.areas.length > 0 ? (
-                          <div className="space-y-0.5">
-                            {team.areas.slice(0, 2).map((area, idx) => (
-                              <div key={idx} className="flex items-center gap-1">
-                                <MapPin className="size-3" />
-                                <span>{area.zone}, {area.city}</span>
-                              </div>
-                            ))}
-                            {team.areas.length > 2 && (
-                              <div className="text-xs opacity-70">+{team.areas.length - 2} more areas</div>
-                            )}
+
+              {/* Location Card */}
+              {(ticket?.location?.coordinates || ticket?.coordinates || ticket?.location) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="size-5 text-blue-600" />
+                      Incident Location
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {/* Map Action */}
+                      {(ticket.location?.coordinates || ticket.coordinates) && (
+                        <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                              <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                Precise Location Available
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300">
+                                GPS coordinates captured from the report
+                              </p>
+                            </div>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="size-3" />
-                            <span>No specific areas</span>
-                          </div>
-                        )}
-                      </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openInGoogleMaps(ticket)}
+                            className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+                          >
+                            <ExternalLink className="size-4 mr-2" />
+                            View on Map
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* No location fallback */}
+                      {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <MapPin className="size-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No location information available</p>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-sm text-muted-foreground">
-                  No teams assigned to this complaint
-                </div>
+                  </CardContent>
+                </Card>
               )}
             </div>
-
-            {/* Location */}
-            {(ticket?.location?.coordinates || ticket?.coordinates || ticket?.location) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="size-5 text-blue-600" />
-                    Incident Location
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Map Action */}
-                    {(ticket.location?.coordinates || ticket.coordinates) && (
-                      <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
-                            <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                              Precise Location Available
-                            </p>
-                            <p className="text-xs text-blue-700 dark:text-blue-300">
-                              GPS coordinates captured from the report
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openInGoogleMaps(ticket)}
-                          className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
-                        >
-                          <ExternalLink className="size-4 mr-2" />
-                          View on Map
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* No location fallback */}
-                    {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <MapPin className="size-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No location information available</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Two-column layout: left Tabs (Notes/Activity), right Details */}
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
