@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Download, Image, Video, File } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
-import type { Ticket, TicketStatus, User, Team } from "@/lib/types";
+import type { Ticket, TicketStatus, User, Team, ChangedBy } from "@/lib/types";
 import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, getUserById, assignTeamsToTicket, getTeams, getTicketAttachments } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -20,20 +20,61 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const validStatuses: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
 
+// Helper function to format role display
+const formatUserRole = (user: ChangedBy | User) => {
+  if (!user) return '';
+
+  // Check for admin role
+  if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
+    return 'Admin';
+  }
+
+  // Check for team leader (staff with isTeamLeader: true)
+  if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
+    return 'Team Lead';
+  }
+
+  // Check for staff
+  if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
+    return 'Staff';
+  }
+
+  // Check for team leader display role
+  if ('displayRole' in user && user.displayRole === 'team_leader') {
+    return 'Team Lead';
+  }
+
+  return '';
+};
+
 // Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | undefined) => {
+const formatChangedBy = (changedBy: string | User | ChangedBy) => {
   if (!changedBy) return 'Unknown User';
 
   if (typeof changedBy === 'string') return changedBy;
 
-  // Handle User type
-  if (changedBy.fullName) return changedBy.fullName;
-  if (changedBy.firstName && changedBy.lastName) {
-    return `${changedBy.firstName} ${changedBy.lastName}`;
+  // Handle User type with role information
+  const userRole = formatUserRole(changedBy);
+  const userName = changedBy.fullName ||
+    (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
+    changedBy.email ||
+    ('name' in changedBy ? changedBy.name : undefined); // Fallback to name field from API
+
+  if (userName && userRole) {
+    return `${userName} (${userRole})`;
   }
-  if (changedBy.email) return changedBy.email;
+
+  // Fallback to name only if available
+  if (userName) return userName;
 
   return 'Unknown User';
+};
+
+// Helper function to open location in Google Maps
+const openInGoogleMaps = (ticket: Ticket) => {
+  if (!ticket.coordinates) return;
+  const url = `https://www.google.com/maps?q=${ticket.coordinates.latitude},${ticket.coordinates.longitude}`;
+  window.open(url, '_blank');
 };
 
 export default function ComplaintDetailPage() {
@@ -318,6 +359,74 @@ export default function ComplaintDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Location Section */}
+            {(ticket?.coordinates || ticket?.location) && (
+              <div className="rounded-lg border p-4 grid gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <MapPin className="size-4 text-blue-600" />
+                  Incident Location
+                </div>
+                <div className="space-y-4">
+                  {/* Address Information */}
+                  {ticket.location && (
+                    <div className="p-3 bg-muted/30 rounded-lg border">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">
+                            📍 Reported Location
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {[
+                              ticket.location.area && `${ticket.location.area}`,
+                              ticket.location.zone && `${ticket.location.zone}`,
+                              ticket.location.city,
+                              ticket.location.state
+                            ].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Map Action */}
+                  {ticket.coordinates && (
+                    <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                          <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                            Precise Location Available
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            GPS coordinates captured from the report
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openInGoogleMaps(ticket)}
+                        className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+                      >
+                        <ExternalLink className="size-4 mr-2" />
+                        View on Map
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* No location fallback */}
+                  {!ticket.location && !ticket.coordinates && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <MapPin className="size-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No location information available</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Two-column layout: left Tabs (Notes/Activity), right Details */}
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">

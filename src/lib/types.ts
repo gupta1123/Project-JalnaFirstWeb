@@ -47,6 +47,18 @@ export type User = {
   }>;
 };
 
+export type ChangedBy = {
+  id: string;
+  name?: string;
+  role?: string;
+  isTeamLeader?: boolean;
+  displayRole?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+};
+
 export type AgencyContact = {
   _id: string;
   name: string;

@@ -26,32 +26,62 @@ import {
   Tag,
   Users,
   CalendarClock,
-  Activity,
-  FileText as FileTextIcon,
-  MessageSquare,
-  Plus,
   Send,
   ExternalLink
 } from "lucide-react";
 import { api, updateTicketStatusTeam, getTicketAttachments, getTeamTicketById, adminGetTicketHistory, adminAddNote } from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
-import { Ticket, User } from "@/lib/types";
+import { Ticket, User, ChangedBy } from "@/lib/types";
 
 // Fetcher function for SWR
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
+// Helper function to format role display
+const formatUserRole = (user: ChangedBy | User) => {
+  if (!user) return '';
+
+  // Check for admin role
+  if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
+    return 'Admin';
+  }
+
+  // Check for team leader (staff with isTeamLeader: true)
+  if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
+    return 'Team Lead';
+  }
+
+  // Check for staff
+  if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
+    return 'Staff';
+  }
+
+  // Check for team leader display role
+  if ('displayRole' in user && user.displayRole === 'team_leader') {
+    return 'Team Lead';
+  }
+
+  return '';
+};
+
 // Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | undefined) => {
+const formatChangedBy = (changedBy: string | User | ChangedBy) => {
   if (!changedBy) return 'Unknown User';
 
   if (typeof changedBy === 'string') return changedBy;
 
-  // Handle User type
-  if (changedBy.fullName) return changedBy.fullName;
-  if (changedBy.firstName && changedBy.lastName) {
-    return `${changedBy.firstName} ${changedBy.lastName}`;
+  // Handle User type with role information
+  const userRole = formatUserRole(changedBy);
+  const userName = changedBy.fullName ||
+    (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
+    changedBy.email ||
+    ('name' in changedBy ? changedBy.name : undefined); // Fallback to name field from API
+
+  if (userName && userRole) {
+    return `${userName} (${userRole})`;
   }
-  if (changedBy.email) return changedBy.email;
+
+  // Fallback to name only if available
+  if (userName) return userName;
 
   return 'Unknown User';
 };
