@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Mail, Phone, Calendar, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Mail, Phone, User as UserIcon } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -124,7 +124,6 @@ function TeamMemberContent({ member }: { member: User }) {
     <div className="grid gap-6 md:grid-cols-2">
       <PersonalInfoCard member={member} />
       <ContactInfoCard member={member} />
-      <AccountInfoCard member={member} />
     </div>
   );
 }
@@ -144,18 +143,6 @@ function PersonalInfoCard({ member }: { member: User }) {
         <InfoRow label="First Name" value={member.firstName} />
         <InfoRow label="Last Name" value={member.lastName} />
         <InfoRow label="Role" value={member.role} className="capitalize" />
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-muted-foreground">Status</span>
-          <StatusBadge isActive={member.isActive} />
-        </div>
-        {member.isBlocked !== undefined && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Account</span>
-            <Badge variant={member.isBlocked ? "destructive" : "outline"}>
-              {member.isBlocked ? 'Blocked' : 'Active'}
-            </Badge>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -194,49 +181,11 @@ function ContactInfoCard({ member }: { member: User }) {
         {member.preferredLanguage && (
           <InfoRow label="Language" value={member.preferredLanguage} className="capitalize" />
         )}
-
-        {member.profileVisibility && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Profile Visibility</span>
-            <Badge variant="outline" className="text-xs">
-              {member.profileVisibility}
-            </Badge>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
 }
 
-// Account information card
-function AccountInfoCard({ member }: { member: User }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Calendar className="h-4 w-4" />
-          Account Information
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-1">
-          <span className="text-sm font-medium text-muted-foreground">Member Since</span>
-          <div className="flex items-center gap-2">
-            <Calendar className="h-3 w-3 text-muted-foreground" />
-            <span className="text-sm">{formatDateTimeSmart(member.createdAt)}</span>
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <span className="text-sm font-medium text-muted-foreground">User ID</span>
-          <code className="text-xs bg-muted px-2 py-1 rounded font-mono block">
-            {member._id}
-          </code>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // Utility components
 function InfoRow({ label, value, className = "" }: { label: string; value?: string; className?: string }) {

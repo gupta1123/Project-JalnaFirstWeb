@@ -65,22 +65,22 @@ export default function TeamMembersPage() {
   const [isRemoveMemberOpen, setIsRemoveMemberOpen] = useState<User | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Get team data using the new API endpoint
-  const { data: teamData, isLoading: myTeamsLoading } = useSWR(
-    "my-team",
-    () => getMyTeam(),
+  // Get all teams data (same as the working API endpoint)
+  const { data: teamsData, isLoading: myTeamsLoading } = useSWR(
+    "all-teams-for-team-members",
+    () => getTeams({ page: 1, limit: 100 }),
     { revalidateOnFocus: false }
   );
 
-  // Determine the teamId to show (prefer the team where user is leader)
+  // Determine the teamId to show (get the first team for now)
   const teamList = useMemo(() => {
-    if (!teamData) return [];
-    if (teamData.team) return [teamData.team];
-    return teamData.teams ?? [];
-  }, [teamData]);
+    if (!teamsData) return [];
+    return teamsData.teams ?? [];
+  }, [teamsData]);
 
   const selectedTeamMeta = useMemo(() => {
-    return teamList.find((t) => t.employees.some(emp => emp.isLeader)) ?? teamList[0];
+    // Show the first team available (since this is team lead view, they should be in at least one team)
+    return teamList[0];
   }, [teamList]);
 
   const teamId = selectedTeamMeta?._id;
@@ -99,28 +99,11 @@ export default function TeamMembersPage() {
     { revalidateOnFocus: false }
   );
 
-  // Get all teams to properly filter assigned staff (same as admin teams page)
-  const { data: teamsData, error: teamsError } = useSWR(
-    "all-teams",
-    () => getTeams({ page: 1, limit: 100 }),
-    { revalidateOnFocus: false }
-  );
+  // Use the same teams data for staff filtering
+  const teamsError = null; // No separate error since we're using the same data
 
   const allStaff: User[] = staffData?.staff ?? [];
   const allTeams: Team[] = teamsData?.teams ?? [];
-
-  // Debug logging (admin teams page style)
-  console.log("TeamMembersPage Debug (admin teams style):", {
-    staffData: staffData ? { staff: staffData.staff?.length, pagination: staffData.pagination } : null,
-    staffError: staffError,
-    teamsData: teamsData ? { teams: teamsData.teams?.length, pagination: teamsData.pagination } : null,
-    teamsError: teamsError,
-    allStaff: allStaff.length,
-    allStaffRoles: allStaff.map(s => ({ id: s._id, role: s.role, name: s.fullName })),
-    allTeams: allTeams.length,
-    team: team ? { id: team._id, employees: team.employees?.length, leaderId: team.leaderId } : null,
-    teamId: teamId
-  });
 
   // Find team lead
   const teamLead = useMemo(() => {
@@ -143,6 +126,35 @@ export default function TeamMembersPage() {
     
     return members;
   }, [team?.employees, team?.leaderId, search]);
+
+  // Debug logging (admin teams page style)
+  console.log("TeamMembersPage Debug (admin teams style):", {
+    teamsData: teamsData ? { teams: teamsData.teams?.length, pagination: teamsData.pagination } : null,
+    myTeamsLoading: myTeamsLoading,
+    teamList: teamList,
+    selectedTeamMeta: selectedTeamMeta,
+    staffData: staffData ? { staff: staffData.staff?.length, pagination: staffData.pagination } : null,
+    staffError: staffError,
+    teamsError: teamsError,
+    allStaff: allStaff.length,
+    allStaffRoles: allStaff.map(s => ({ id: s._id, role: s.role, name: s.fullName })),
+    allTeams: allTeams.length,
+    team: team ? { 
+      id: team._id, 
+      name: team.name,
+      employees: team.employees?.length, 
+      leaderId: team.leaderId,
+      employeesList: team.employees?.map(emp => ({ 
+        id: emp._id, 
+        name: emp.fullName, 
+        email: emp.email, 
+        isLeader: emp.isLeader 
+      }))
+    } : null,
+    teamId: teamId,
+    teamLead: teamLead ? { id: teamLead._id, name: teamLead.fullName, isLeader: teamLead.isLeader } : null,
+    filteredMembers: filteredMembers.map(m => ({ id: m._id, name: m.fullName, email: m.email }))
+  });
 
 
   const unassignedStaff = useMemo(() => {
@@ -270,7 +282,7 @@ export default function TeamMembersPage() {
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20 flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {team.employees.length} members
+                    {team.employees?.length || 0} members
                   </Badge>
                   <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20 flex items-center gap-1">
                     <Crown className="h-3 w-3" />
@@ -415,7 +427,7 @@ export default function TeamMembersPage() {
               <div>
                 <h4 className="font-medium mb-2">Coverage Areas</h4>
                 <div className="space-y-2">
-                  {team.areas.map((area, i) => (
+                  {team.areas?.map((area, i) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                       <div>
@@ -425,7 +437,9 @@ export default function TeamMembersPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )) || (
+                    <div className="text-sm text-muted-foreground">No coverage areas defined</div>
+                  )}
                 </div>
               </div>
             </CardContent>
