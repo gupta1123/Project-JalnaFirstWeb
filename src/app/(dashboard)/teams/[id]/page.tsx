@@ -11,9 +11,7 @@ import {
   getStaff,
   getTeams,
   addEmployeesToTeam,
-  removeEmployeeFromTeam,
   updateTeamLeader,
-  updateStaff,
 } from "@/lib/api";
 import type { User, Team } from "@/lib/types";
 import { formatDateTimeSmart } from "@/lib/utils";
@@ -31,8 +29,6 @@ import {
   MapPin, 
   Crown, 
   UserCog, 
-  Edit, 
-  Trash2, 
   ArrowLeft, 
   Users, 
   Building2, 
@@ -50,9 +46,7 @@ export default function TeamDetailsPage() {
   const teamId = params?.id;
   const [submitting, setSubmitting] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [isEditMemberOpen, setIsEditMemberOpen] = useState<null | User>(null);
   const [isChangeLeaderOpen, setIsChangeLeaderOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<null | { member: User; memberName: string }>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
   const { data: team, isLoading, mutate } = useSWR(teamId ? ["team", teamId] : null, () => getTeamById(teamId!), { revalidateOnFocus: false });
@@ -90,35 +84,7 @@ export default function TeamDetailsPage() {
     }
   };
 
-  const onRemoveMember = async (employeeId: string, memberName: string) => {
-    if (!team) return;
-    setSubmitting(true);
-    try {
-      await removeEmployeeFromTeam(team._id, employeeId);
-      toast.success("Member removed from team");
-      mutate();
-      setIsDeleteConfirmOpen(null);
-    } catch {
-      toast.error("Failed to remove team member");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
-  const onEditMember = async (memberId: string, updates: { firstName?: string; lastName?: string; email?: string; phoneNumber?: string; isActive?: boolean }) => {
-    setSubmitting(true);
-    try {
-      await updateStaff(memberId, updates);
-      toast.success("Staff member updated");
-      setIsEditMemberOpen(null);
-      mutate();
-      staffMutate();
-    } catch {
-      toast.error("Failed to update staff member");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const onSetLeader = async (leaderId: string) => {
     if (!team) return;
@@ -333,27 +299,6 @@ export default function TeamDetailsPage() {
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => setIsEditMemberOpen(member)} 
-                              disabled={submitting} 
-                              title="Edit member"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              onClick={() => setIsDeleteConfirmOpen({ member, memberName: member.fullName || member.email })} 
-                              disabled={submitting} 
-                              title="Remove from team"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </motion.div>
                       ))}
                     </div>
@@ -427,17 +372,6 @@ export default function TeamDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Member */}
-      <Dialog open={!!isEditMemberOpen} onOpenChange={(o) => !o && setIsEditMemberOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Team Member</DialogTitle>
-          </DialogHeader>
-          {isEditMemberOpen && (
-            <EditMemberForm member={isEditMemberOpen} onSubmit={onEditMember} submitting={submitting} />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Change Team Lead */}
       <Dialog open={isChangeLeaderOpen} onOpenChange={setIsChangeLeaderOpen}>
@@ -451,69 +385,6 @@ export default function TeamDetailsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      <Dialog open={!!isDeleteConfirmOpen} onOpenChange={(open) => !open && setIsDeleteConfirmOpen(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-                <Trash2 className="h-5 w-5 text-destructive" />
-              </div>
-              <div>
-                <DialogTitle>Remove Team Member</DialogTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  This action cannot be undone.
-                </p>
-              </div>
-            </div>
-          </DialogHeader>
-          
-          {isDeleteConfirmOpen && (
-            <div className="py-4">
-              <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback className="text-sm font-medium">
-                    {getInitials(isDeleteConfirmOpen.member.fullName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{isDeleteConfirmOpen.memberName}</div>
-                  <div className="text-sm text-muted-foreground">{isDeleteConfirmOpen.member.email}</div>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground mt-4">
-                Are you sure you want to remove <strong>{isDeleteConfirmOpen.memberName}</strong> from this team? 
-                They will no longer have access to team resources and assignments.
-              </p>
-            </div>
-          )}
-
-          <DialogFooter className="gap-2">
-            <DialogClose asChild>
-              <Button variant="outline" disabled={submitting}>
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button 
-              variant="destructive" 
-              onClick={() => isDeleteConfirmOpen && onRemoveMember(isDeleteConfirmOpen.member._id, isDeleteConfirmOpen.memberName)}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Removing...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove Member
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -673,46 +544,6 @@ function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffI
   );
 }
 
-function EditMemberForm({ member, onSubmit, submitting }: { member: User; onSubmit: (memberId: string, updates: { firstName?: string; lastName?: string; email?: string; phoneNumber?: string; isActive?: boolean }) => Promise<void>; submitting: boolean; }) {
-  const [formData, setFormData] = useState({ firstName: member.firstName, lastName: member.lastName, email: member.email, phoneNumber: member.phoneNumber, isActive: member.isActive });
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.firstName?.trim() || !formData.lastName?.trim() || !formData.email?.trim()) { toast.error("Please fill all required fields"); return; }
-    await onSubmit(member._id, formData);
-  };
-  return (
-    <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="firstName">First Name *</Label>
-          <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))} required />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="lastName">Last Name *</Label>
-          <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))} required />
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="email">Email *</Label>
-        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} required />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="phoneNumber">Phone Number</Label>
-        <Input id="phoneNumber" type="tel" value={formData.phoneNumber || ""} onChange={(e) => setFormData((p) => ({ ...p, phoneNumber: e.target.value }))} placeholder="+91 98765 43210" />
-      </div>
-      <div className="flex items-center space-x-2">
-        <input type="checkbox" id="isActive" checked={!!formData.isActive} onChange={(e) => setFormData((p) => ({ ...p, isActive: e.target.checked }))} className="rounded border-gray-300" />
-        <Label htmlFor="isActive" className="text-sm">Active staff member</Label>
-      </div>
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
-        </DialogClose>
-        <Button type="submit" disabled={submitting}>{submitting ? "Updating..." : "Update"}</Button>
-      </DialogFooter>
-    </form>
-  );
-}
 
 function ChangeLeaderForm({ team, onSubmit, submitting }: { team: Team; onSubmit: (teamId: string, leaderId: string) => Promise<void>; submitting: boolean; }) {
   const [selectedLeader, setSelectedLeader] = useState(team.leaderId || "");

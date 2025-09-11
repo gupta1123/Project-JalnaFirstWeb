@@ -41,9 +41,10 @@ export type User = {
   teams?: Array<{
     id: string;
     name: string;
-    leaderId: string;
+    leaderId?: string;
     isLeader: boolean;
-    isMember: boolean;
+    isMember?: boolean;
+    leaderName?: string;
   }>;
 };
 
@@ -133,7 +134,7 @@ export type TicketCategory =
   | "other";
 
 export type TicketPriority = "low" | "medium" | "high" | "urgent";
-export type TicketStatus = "open" | "in_progress" | "resolved" | "closed";
+export type TicketStatus = "open" | "in_progress" | "assigned" | "resolved" | "closed";
 
 export type Ticket = {
   _id: string;

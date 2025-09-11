@@ -67,7 +67,11 @@ function CreateCategoryPage() {
     // If there are multiple teams, find the one where user is leader
     if (teamData.teams && teamData.teams.length > 0) {
       console.log("Found multiple teams:", teamData.teams);
-      const leaderTeam = teamData.teams.find(t => t.employees.some(emp => emp.isLeader));
+      const leaderTeam = teamData.teams.find(t => 
+        t.employees && 
+        Array.isArray(t.employees) && 
+        t.employees.some(emp => emp && emp.isLeader)
+      );
       console.log("Leader team found:", leaderTeam);
       if (leaderTeam) {
         return leaderTeam._id;

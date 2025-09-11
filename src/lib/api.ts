@@ -523,6 +523,7 @@ export async function getTeamTicketsMinimal(params?: {
   return res.data as {
     tickets: Array<{
       id: string;
+      ticketNumber?: string;
       description: string;
       coordinates?: { latitude: number; longitude: number };
       attachments: unknown[];

@@ -25,7 +25,7 @@ export default function ComplaintsPage() {
   const [category, setCategory] = useState<string>("");
   const [priority, setPriority] = useState<string>("");
   const params = useMemo(() => {
-    const allowed = new Set(["open", "in_progress", "resolved", "closed"]);
+    const allowed = new Set(["open", "in_progress", "assigned", "resolved", "closed"]);
     const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
     if (search && search.trim()) p.search = search.trim();
     if (status && allowed.has(status)) p.status = status;
@@ -50,6 +50,7 @@ export default function ComplaintsPage() {
                 <SelectItem value="all">All status</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="in_progress">In progress</SelectItem>
+                <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="resolved">Resolved</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>
               </SelectContent>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Mail, Phone, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Mail, Phone, User as UserIcon, Users, Crown } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -122,9 +122,12 @@ function StaffHeader({ staff, onBack }: { staff: User; onBack: () => void }) {
 // Main content component
 function StaffContent({ staff }: { staff: User }) {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <PersonalInfoCard staff={staff} />
-      <ContactInfoCard staff={staff} />
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        <PersonalInfoCard staff={staff} />
+        <ContactInfoCard staff={staff} />
+      </div>
+      <TeamInfoCard staff={staff} />
     </div>
   );
 }
@@ -143,7 +146,6 @@ function PersonalInfoCard({ staff }: { staff: User }) {
         <InfoRow label="Full Name" value={staff.fullName} />
         <InfoRow label="First Name" value={staff.firstName} />
         <InfoRow label="Last Name" value={staff.lastName} />
-        <InfoRow label="Role" value={staff.role} className="capitalize" />
       </CardContent>
     </Card>
   );
@@ -187,7 +189,60 @@ function ContactInfoCard({ staff }: { staff: User }) {
   );
 }
 
+// Team information card
+function TeamInfoCard({ staff }: { staff: User }) {
+  const getRoleDisplay = (isLeader: boolean) => {
+    return isLeader ? "Team Lead" : "Staff";
+  };
 
+  const getRoleBadgeVariant = (isLeader: boolean) => {
+    return isLeader ? "default" : "secondary";
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Users className="h-4 w-4" />
+          Team Information
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {staff.teams && staff.teams.length > 0 ? (
+          <div className="space-y-3">
+            {staff.teams.map((team, index) => (
+              <div key={team.id || index} className="p-3 border rounded-lg bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm">{team.name}</span>
+                  <Badge variant={getRoleBadgeVariant(team.isLeader)} className="text-xs">
+                    {team.isLeader ? (
+                      <>
+                        <Crown className="h-3 w-3 mr-1" />
+                        {getRoleDisplay(team.isLeader)}
+                      </>
+                    ) : (
+                      getRoleDisplay(team.isLeader)
+                    )}
+                  </Badge>
+                </div>
+                {team.leaderName && !team.isLeader && (
+                  <div className="text-xs text-muted-foreground">
+                    Team Lead: {team.leaderName}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">No team assigned</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 // Utility components
 function InfoRow({ label, value, className = "" }: { label: string; value?: string; className?: string }) {

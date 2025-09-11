@@ -101,6 +101,7 @@ export default function StaffPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Team</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="w-[120px] text-right">Actions</TableHead>
                 </TableRow>
@@ -113,6 +114,7 @@ export default function StaffPage() {
                         <TableCell><Skeleton className="h-4 w-44" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-64" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                         <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                         <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-full ml-auto" /></TableCell>
                       </TableRow>
@@ -121,7 +123,7 @@ export default function StaffPage() {
                 )}
                 {!isLoading && staff.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5}>No staff found</TableCell>
+                    <TableCell colSpan={6}>No staff found</TableCell>
                   </TableRow>
                 )}
                 {staff.map((s) => (
@@ -129,6 +131,24 @@ export default function StaffPage() {
                     <TableCell>{s.fullName ?? `${s.firstName} ${s.lastName}`}</TableCell>
                     <TableCell>{s.email}</TableCell>
                     <TableCell>{s.phoneNumber || "—"}</TableCell>
+                    <TableCell>
+                      {s.teams && s.teams.length > 0 ? (
+                        <div className="space-y-1">
+                          {s.teams.map((team, index) => (
+                            <div key={team.id} className="text-sm">
+                              <span className="font-medium">{team.name}</span>
+                              {team.isLeader && (
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  Leader
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? "Active" : "Inactive"}</Badge>
                     </TableCell>

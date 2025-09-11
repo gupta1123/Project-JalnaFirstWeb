@@ -40,9 +40,9 @@ const getNavigationData = (userRole: string, isTeamLead: boolean = false) => {
       ...(isStaff ? [{ name: "My Tickets", url: "/my-tickets", icon: Ticket }] : []),
       ...(isAdmin ? [{ name: "Agency Contacts", url: "/agency-contacts", icon: Megaphone }] : []),
       ...(isAdmin ? [{ name: "Teams", url: "/teams", icon: UsersRound }] : []),
-      ...(isAdmin ? [{ name: "Categories", url: "/admin-categories", icon: Tags }] : []),
+      // ...(isAdmin ? [{ name: "Categories", url: "/admin-categories", icon: Tags }] : []), // Hidden from sidebar
       ...(isTeamLead ? [{ name: "Team Members", url: "/team-members", icon: UserCheck }] : []),
-      ...(isTeamLead ? [{ name: "Categories", url: "/categories", icon: Tags }] : []),
+      // ...(isTeamLead ? [{ name: "Categories", url: "/categories", icon: Tags }] : []), // Hidden from sidebar
     ],
   };
 };

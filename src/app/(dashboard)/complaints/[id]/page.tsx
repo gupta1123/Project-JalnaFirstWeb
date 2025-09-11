@@ -8,17 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import type { Ticket, TicketStatus, User, Team, ChangedBy } from "@/lib/types";
-import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, getUserById, assignTeamsToTicket, getTeams, getTicketAttachments } from "@/lib/api";
+import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, assignTeamsToTicket, getTeams, getTicketAttachments } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const validStatuses: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
 
 // Helper function to format role display
 const formatUserRole = (user: ChangedBy | User) => {
@@ -85,23 +84,6 @@ export default function ComplaintDetailPage() {
   const { data, isLoading, mutate } = useSWR(id ? ["ticket-admin", id] : null, () => adminGetTicketById(id));
   const ticket = data as Ticket | undefined;
 
-  const requesterUserId = useMemo(() => {
-    const createdBy = ticket?.createdBy as unknown;
-    if (!createdBy) return undefined;
-    if (typeof createdBy === "string") return createdBy;
-    if (typeof createdBy === "object") {
-      const obj = createdBy as Record<string, unknown>;
-      return (obj._id as string) ?? (obj.id as string) ?? undefined;
-    }
-    return undefined;
-  }, [ticket]);
-
-  const { data: requester, isLoading: isLoadingRequester } = useSWR(
-    requesterUserId ? ["user", requesterUserId] : null,
-    () => getUserById(requesterUserId as string),
-    { revalidateOnFocus: false }
-  );
-  const requesterUser = requester as User | undefined;
 
 
   type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: string; changedAt?: string };
@@ -118,11 +100,7 @@ export default function ComplaintDetailPage() {
   }), [historyResp]);
 
  
-  useEffect(() => {
-    if (ticket?.status) setStatus(ticket.status);
-  }, [ticket?.status]);
 
-  const [status, setStatus] = useState<TicketStatus>(ticket?.status ?? "open");
   const [note, setNote] = useState<string>("");
   const [noteOpen, setNoteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -163,7 +141,9 @@ export default function ComplaintDetailPage() {
     setSubmitting(true);
     try {
       await assignTeamsToTicket(id, teamIds, 'replace');
-      toast.success("Teams assigned successfully");
+      // Also update status to "assigned" when teams are assigned
+      await adminUpdateTicketStatus(id, { status: "assigned" });
+      toast.success("Teams assigned successfully and status updated to assigned");
       mutate(); 
       setAssignTeamsOpen(false);
     } catch (error) {
@@ -176,6 +156,7 @@ export default function ComplaintDetailPage() {
   function statusBadgeClass(s: TicketStatus) {
     if (s === "open") return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
     if (s === "in_progress") return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20";
+    if (s === "assigned") return "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/20";
     if (s === "resolved") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
     if (s === "closed") return "bg-muted text-muted-foreground border-muted-foreground/20";
     return "";
@@ -185,19 +166,6 @@ export default function ComplaintDetailPage() {
     try { await navigator.clipboard.writeText(ticket?.ticketNumber ?? ticket?._id ?? ""); setCopiedId(true); setTimeout(()=>setCopiedId(false), 1000);} catch {}
   }
 
-  async function saveStatus() {
-    try {
-      setSubmitting(true);
-      await adminUpdateTicketStatus(id, { status });
-      toast.success("Status updated");
-      await mutate();
-      await mutateHistory();
-    } catch {
-      toast.error("Failed to update status");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   async function addNote() {
     try {
@@ -242,16 +210,6 @@ export default function ComplaintDetailPage() {
 
                 <div className="flex flex-col gap-2 md:items-end">
                   <div className="flex flex-wrap gap-2 justify-end">
-                    {ticket.category && (
-                      <Badge variant="secondary" className="capitalize flex items-center gap-1">
-                        <Tag className="size-3.5" />
-                        {typeof ticket.category === 'string'
-                          ? ticket.category
-                          : typeof ticket.category === 'object' && ticket.category && 'name' in ticket.category
-                          ? (ticket.category as { name: string }).name
-                          : 'Category'}
-                      </Badge>
-                    )}
                     {ticket.priority && (
                       <Badge className="capitalize flex items-center gap-1"><Flag className="size-3.5" /> {ticket.priority}</Badge>
                     )}
@@ -273,20 +231,13 @@ export default function ComplaintDetailPage() {
               )}
            
               <div className="flex flex-wrap gap-2 justify-end pt-2">
-                <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)} disabled={isClosed}>
-                  <SelectTrigger className="h-8 w-[180px] sm:w-[220px]">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {validStatuses.map((s) => (
-                      <SelectItem key={s} value={s} className="capitalize" disabled={s === 'closed'}>
-                        {s.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={saveStatus} disabled={submitting || isClosed}>Save</Button>
-            </div>
+                <Badge 
+                  variant="outline" 
+                  className={`capitalize ${statusBadgeClass(ticket?.status ?? 'open')}`}
+                >
+                  {ticket?.status?.replace(/_/g, " ") || "open"}
+                </Badge>
+              </div>
             </div>
 
          
@@ -307,11 +258,11 @@ export default function ComplaintDetailPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setAssignTeamsOpen(true)}
-                        disabled={submitting}
+                        disabled={true}
+                        className="opacity-50 cursor-not-allowed"
                       >
                         <Users className="size-3 mr-1" />
-                        Manage
+                        Teams Assigned
                       </Button>
                     </div>
                   ) : (
@@ -417,10 +368,9 @@ export default function ComplaintDetailPage() {
               )}
             </div>
 
-            {/* Two-column layout: left Tabs (Notes/Activity), right Details */}
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
-              {/* LEFT */}
-              <div className="lg:col-span-8">
+            {/* Single column layout: Tabs (Notes/Activity) */}
+            <div className="grid grid-cols-1 gap-3">
+              <div>
                 <Card>
                   <CardHeader className="pb-2"><CardTitle>Notes & Activity</CardTitle></CardHeader>
                   <CardContent>
@@ -590,57 +540,6 @@ export default function ComplaintDetailPage() {
                 </Card>
               </div>
 
-              {/* RIGHT */}
-              <div className="lg:col-span-4">
-                <Card>
-                  <CardContent className="grid gap-3">
-                    <div className="rounded-lg border p-4 grid gap-1">
-                      <div className="text-sm font-medium mb-1 flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /> Requester</div>
-                      {requesterUserId ? (
-                        <Link href={`/users/${requesterUserId}`} className="text-sm underline underline-offset-2 hover:text-accent-foreground">
-                          {requesterUser?.fullName ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'fullName' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).fullName as string : '-')}
-                        </Link>
-                      ) : (
-                        <div className="text-sm">{requesterUser?.fullName ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'fullName' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).fullName as string : '-')}</div>
-                      )}
-                      <div className="text-xs text-muted-foreground">{requesterUser?.email ?? (typeof ticket.createdBy === 'object' && ticket.createdBy && 'email' in ticket.createdBy ? (ticket.createdBy as Record<string, unknown>).email as string : '')}</div>
-                      {requesterUser?.phoneNumber && (
-                        <div className="text-xs text-muted-foreground">{requesterUser.phoneNumber}</div>
-                      )}
-                    </div>
-                    <div className="rounded-lg border p-4 grid gap-1">
-                      <div className="text-sm font-medium mb-1 flex items-center gap-2"><MapPin className="size-4 text-muted-foreground" /> Address</div>
-                      {requesterUser?.address ? (
-                        <div className="text-sm text-muted-foreground space-y-0.5">
-                          {(() => {
-                            const addr = requesterUser.address!;
-                            const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-                            const city = addr.city?.trim();
-                            const lineHasCity = (line?: string) => !!(line && city && line.toLowerCase().includes(city.toLowerCase()));
-                            const line1Text = addr.line1 ? `${addr.line1}${!lineHasCity(addr.line1) && city ? `, ${city}` : ''}` : undefined;
-                            const line2Raw = addr.line2 ? `${addr.line2}` : undefined;
-                            const showLine2 = line1Text && line2Raw ? normalize(line1Text) !== normalize(line2Raw) : Boolean(line2Raw);
-                            const tail = [addr.state, addr.zipCode, addr.country].filter(Boolean).join(", ");
-                            return (
-                              <>
-                                {line1Text && <div>{line1Text}</div>}
-                                {showLine2 && <div>{line2Raw}</div>}
-                                {tail ? <div>{tail}</div> : (!line1Text && !showLine2 ? <div>-</div> : null)}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground">
-                          <div>Zone: {ticket.location?.zone ?? '-'}</div>
-                          <div>City: {ticket.location?.city ?? '-'}</div>
-                          <div>State: {ticket.location?.state ?? '-'}</div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </div>
         )}

@@ -13,6 +13,7 @@ import {
   addEmployeesToTeam,
   getStaff,
   getTeams,
+  createStaff,
   // updateTeamLeader, // removed (no longer changing team lead)
 } from "@/lib/api";
 import type { User, Team } from "@/lib/types";
@@ -20,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -37,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +60,7 @@ import {
   MapPin,
   Building2,
   UserCheck,
+  Plus,
 } from "lucide-react";
 
 export default function TeamMembersPage() {
@@ -298,7 +302,7 @@ export default function TeamMembersPage() {
               variant="secondary"
               className="bg-foreground/10 text-inherit hover:bg-foreground/20 border-foreground/20"
             >
-              <UserPlus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-1" />
               Add Member
             </Button>
           </div>
@@ -449,26 +453,44 @@ export default function TeamMembersPage() {
 
       {/* Add Member Dialog */}
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
           </DialogHeader>
-          {!staffData || !teamsData ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-sm text-muted-foreground">Loading staff data...</p>
-              </div>
-            </div>
-          ) : (
-            <AddMemberForm 
-              teamId={team?._id || ""}
-              team={team}
-              unassignedStaff={unassignedStaff}
-              onAddMember={onAddMember}
-              submitting={submitting}
-            />
-          )}
+          <Tabs defaultValue="existing" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing">Add Existing Staff</TabsTrigger>
+              <TabsTrigger value="create">Create New Staff</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="existing" className="mt-4">
+              {!staffData || !teamsData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-sm text-muted-foreground">Loading staff data...</p>
+                  </div>
+                </div>
+              ) : (
+                <AddExistingMemberForm 
+                  teamId={team?._id || ""}
+                  team={team}
+                  unassignedStaff={unassignedStaff}
+                  onAddMember={onAddMember}
+                  submitting={submitting}
+                />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="create" className="mt-4">
+              <CreateNewMemberForm 
+                teamId={team?._id || ""}
+                team={team}
+                onAddMember={onAddMember}
+                submitting={submitting}
+              />
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
@@ -531,8 +553,8 @@ export default function TeamMembersPage() {
   );
 }
 
-// Add Member Form Component (showing only unassigned staff members)
-function AddMemberForm({ 
+// Add Existing Member Form Component (showing only unassigned staff members)
+function AddExistingMemberForm({ 
   teamId, 
   team, 
   unassignedStaff, 
@@ -601,6 +623,148 @@ function AddMemberForm({
         </DialogClose>
         <Button type="submit" disabled={submitting || !selectedStaff || unassignedStaff.length === 0}>
           {submitting ? "Adding..." : "Add Member"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+// Create New Member Form Component
+function CreateNewMemberForm({
+  teamId,
+  team,
+  onAddMember,
+  submitting,
+}: {
+  teamId: string;
+  team?: Team;
+  onAddMember: (teamId: string, employeeId: string) => Promise<void>;
+  submitting: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    phoneNumber: "",
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim() || !formData.phoneNumber.trim()) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      // Step 1: Create staff member
+      const staffResponse = await createStaff({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        phoneNumber: formData.phoneNumber,
+      });
+
+      // Step 2: Add to team
+      await onAddMember(teamId, staffResponse.staff._id);
+      
+      // Reset form
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        password: "",
+        phoneNumber: "",
+      });
+      
+      toast.success("Staff member created and added to team successfully");
+    } catch (error: unknown) {
+      const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error || 
+                          (error as { message?: string })?.message || 
+                          "Failed to create staff member";
+      toast.error(errorMessage);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="firstName">First Name *</Label>
+          <Input
+            id="firstName"
+            value={formData.firstName}
+            onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+            placeholder="John"
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Last Name *</Label>
+          <Input
+            id="lastName"
+            value={formData.lastName}
+            onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+            placeholder="Doe"
+            required
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">Email Address *</Label>
+        <Input
+          id="email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+          placeholder="john.doe@example.com"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="phoneNumber">Phone Number *</Label>
+        <Input
+          id="phoneNumber"
+          type="tel"
+          value={formData.phoneNumber}
+          onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
+          placeholder="1234567890"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password *</Label>
+        <Input
+          id="password"
+          type="password"
+          value={formData.password}
+          onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+          placeholder="Enter a secure password"
+          required
+          minLength={6}
+        />
+        <p className="text-xs text-muted-foreground">
+          Password must be at least 6 characters long
+        </p>
+      </div>
+
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button type="button" variant="secondary">Cancel</Button>
+        </DialogClose>
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Creating..." : "Create & Add Member"}
         </Button>
       </DialogFooter>
     </form>

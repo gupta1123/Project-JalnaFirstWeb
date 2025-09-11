@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import {
   getTeams,
   getStaff,
-  addEmployeesToTeam,
   removeEmployeeFromTeam,
   updateTeamLeader,
   updateStaff,
@@ -41,6 +40,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import { 
   Select, 
   SelectContent, 
@@ -48,12 +48,10 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { 
   Plus, 
   MoreVertical, 
   Eye, 
-  UserPlus, 
   Crown, 
   Trash2,
   Users,
@@ -68,7 +66,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function TeamsPage() {
   const [search, setSearch] = useState("");
   // const [isViewOpen, setIsViewOpen] = useState<null | string>(null);
-  const [isAddMemberOpen, setIsAddMemberOpen] = useState<null | string>(null);
   const [isEditMemberOpen, setIsEditMemberOpen] = useState<null | {teamId: string, member: User}>(null);
   const [isChangeLeaderOpen, setIsChangeLeaderOpen] = useState<null | string>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -102,19 +99,6 @@ export default function TeamsPage() {
   }, [teams]);
 
 
-  const onAddMember = async (teamId: string, employeeId: string) => {
-    setSubmitting(true);
-    try {
-      await addEmployeesToTeam(teamId, [employeeId]);
-      toast.success("Member added to team");
-      setIsAddMemberOpen(null);
-      mutate();
-    } catch (e) {
-      toast.error("Failed to add member");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const onRemoveMember = async (teamId: string, employeeId: string) => {
     setSubmitting(true);
@@ -272,9 +256,6 @@ export default function TeamsPage() {
                               <Eye className="size-4" /> View Details
                             </DropdownMenuItem>
                           </Link>
-                          <DropdownMenuItem onClick={() => setIsAddMemberOpen(team._id)}>
-                            <UserPlus className="size-4" /> Add Member
-                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -288,24 +269,6 @@ export default function TeamsPage() {
 
       {/* View moved to dedicated page at /teams/[id] */}
 
-      {/* Add Member Dialog */}
-      <Dialog open={!!isAddMemberOpen} onOpenChange={(open) => !open && setIsAddMemberOpen(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
-          </DialogHeader>
-          {isAddMemberOpen && (
-            <AddMemberForm 
-              teamId={isAddMemberOpen}
-              team={teamById.get(isAddMemberOpen)}
-              allStaff={allStaff}
-              onAddMember={onAddMember}
-              submitting={submitting}
-              assignedStaffIds={assignedStaffIds}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Member Dialog */}
       <Dialog open={!!isEditMemberOpen} onOpenChange={(open) => !open && setIsEditMemberOpen(null)}>
@@ -470,73 +433,6 @@ function TeamLeadDisplay({ teamId, fallbackName }: { teamId: string; fallbackNam
   );
 }
 
-// Add Member Form Component
-function AddMemberForm({ 
-  teamId, 
-  team, 
-  allStaff, 
-  onAddMember, 
-  submitting,
-  assignedStaffIds,
-}: { 
-  teamId: string;
-  team?: Team;
-  allStaff: User[];
-  onAddMember: (teamId: string, employeeId: string) => Promise<void>;
-  submitting: boolean;
-  assignedStaffIds: Set<string>;
-}) {
-  const [selectedStaff, setSelectedStaff] = useState<string>("");
-
-  if (!team) return <div>Team not found</div>;
-
-  // Filter out staff already assigned to any team
-  const availableStaff = allStaff.filter((staff) => 
-    staff.role === 'staff' && !assignedStaffIds.has(staff._id)
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStaff) {
-      toast.error("Please select a staff member");
-      return;
-    }
-    await onAddMember(teamId, selectedStaff);
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid gap-2">
-        <Label>Select Staff Member</Label>
-        <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a staff member to add" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableStaff.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">No available staff members</div>
-            ) : (
-              availableStaff.map((staff) => (
-                <SelectItem key={staff._id} value={staff._id}>
-                  {staff.fullName} ({staff.email})
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
-        </DialogClose>
-        <Button type="submit" disabled={submitting || !selectedStaff || availableStaff.length === 0}>
-          {submitting ? "Adding..." : "Add Member"}
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
 
 // Edit Member Form Component
 function EditMemberForm({ 

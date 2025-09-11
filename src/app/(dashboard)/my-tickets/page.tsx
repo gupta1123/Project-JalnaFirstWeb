@@ -181,7 +181,7 @@ export default function MyTicketsPage() {
                         className="underline font-mono text-sm"
                         href={`/my-tickets/${ticket.id}`}
                       >
-                        {ticket.id.slice(-8)}
+                        {ticket.ticketNumber || ticket.id.slice(-8)}
                       </Link>
                     </TableCell>
                     <TableCell>
@@ -193,29 +193,18 @@ export default function MyTicketsPage() {
                     </TableCell>
                     <TableCell>
                       {ticket.coordinates ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="size-3 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">
-                              Location available
-                            </span>
-                          </div>
-                          <button
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md transition-colors"
-                            onClick={() => {
-                              const url = `https://www.google.com/maps?q=${ticket.coordinates!.latitude},${ticket.coordinates!.longitude}`;
-                              window.open(url, '_blank');
-                            }}
-                            title="View on map"
-                          >
-                            View Map
-                          </button>
-                        </div>
+                        <button
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-md transition-colors"
+                          onClick={() => {
+                            const url = `https://www.google.com/maps?q=${ticket.coordinates!.latitude},${ticket.coordinates!.longitude}`;
+                            window.open(url, '_blank');
+                          }}
+                          title="View on map"
+                        >
+                          View Map
+                        </button>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <MapPin className="size-3 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">No location</span>
-                        </div>
+                        <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </TableCell>
                     <TableCell>

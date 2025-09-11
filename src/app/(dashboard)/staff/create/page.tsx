@@ -55,9 +55,12 @@ export default function CreateStaffPage() {
     try {
       await createStaff(formData);
       toast.success("Staff member created successfully");
-      router.push("/staff"); // Navigate back to the staff list
-    } catch (err) {
-      toast.error("Failed to create staff member");
+      router.push("/staff"); 
+    } catch (err: unknown) {
+      const errorMessage = (err as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error || 
+                          (err as { message?: string })?.message || 
+                          "Failed to create staff member";
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }

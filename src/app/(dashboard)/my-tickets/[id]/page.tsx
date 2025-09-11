@@ -32,7 +32,8 @@ import {
   Eye,
   Image,
   Video,
-  File
+  File,
+  Play
 } from "lucide-react";
 import { api, updateTicketStatusTeam, getTicketAttachments, getTeamTicketById, adminGetTicketHistory, adminAddNote } from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
@@ -104,6 +105,7 @@ const getStatusBadge = (status: string | undefined) => {
   const statusConfig = {
     open: { variant: "secondary" as const, className: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
     in_progress: { variant: "default" as const, className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+    assigned: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
     pending_user: { variant: "secondary" as const, className: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
     pending_admin: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
     resolved: { variant: "secondary" as const, className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
@@ -125,7 +127,6 @@ interface StaffTicketDetailPageProps {
 
 export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageProps) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [newStatus, setNewStatus] = useState("");
   const [resolutionNote, setResolutionNote] = useState("");
   const [activeSubTab, setActiveSubTab] = useState("activity");
   const [newNote, setNewNote] = useState("");
@@ -181,22 +182,41 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const isClosed = !!ticket && ticket.status === 'closed';
 
 
-  const handleStatusUpdate = async () => {
-    if (!newStatus || !ticket) return;
+  const handleStartWork = async () => {
+    if (!ticket) return;
 
     try {
       setUpdatingStatus(true);
       await updateTicketStatusTeam(id, {
-        status: newStatus as "in_progress" | "pending_user" | "pending_admin" | "resolved"
+        status: "in_progress"
       });
-      toast.success("Ticket status updated successfully");
+      toast.success("Work started successfully");
       mutate(); // Refresh the ticket data
-      setNewStatus("");
+    } catch (error: unknown) {
+      console.error("Failed to start work:", error);
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to start work"
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleMarkResolved = async () => {
+    if (!ticket) return;
+
+    try {
+      setUpdatingStatus(true);
+      await updateTicketStatusTeam(id, {
+        status: "resolved"
+      });
+      toast.success("Ticket marked as resolved");
+      mutate(); // Refresh the ticket data
       setResolutionNote("");
     } catch (error: unknown) {
-      console.error("Failed to update ticket status:", error);
+      console.error("Failed to mark as resolved:", error);
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update ticket status"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark as resolved"
       );
     } finally {
       setUpdatingStatus(false);
@@ -315,31 +335,14 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <div>
                     <CardTitle className="text-xl flex items-center gap-2">
                       <Hash className="size-5 text-muted-foreground" />
-                      Ticket #{ticket._id?.slice(-8) || id.slice(-8)}
+                      Ticket #{ticket.ticketNumber || ticket._id?.slice(-8) || id.slice(-8)}
                     </CardTitle>
-                    {ticket.ticketNumber && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Reference: {ticket.ticketNumber}
-                      </p>
-                    )}
                   </div>
-                  
-                  <div className="flex items-center flex-wrap gap-2">
-                    {getStatusBadge(ticket?.status)}
-                    {ticket.priority && (
-                      <Badge 
-                        variant="outline" 
-                        className={`
-                          ${ticket.priority === 'urgent' ? 'border-red-500 text-red-700 dark:text-red-300' : ''}
-                          ${ticket.priority === 'high' ? 'border-orange-500 text-orange-700 dark:text-orange-300' : ''}
-                          ${ticket.priority === 'medium' ? 'border-yellow-500 text-yellow-700 dark:text-yellow-300' : ''}
-                          ${ticket.priority === 'low' ? 'border-green-500 text-green-700 dark:text-green-300' : ''}
-                        `}
-                      >
-                        <Flag className="size-3 mr-1" />
-                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)} Priority
-                      </Badge>
-                    )}
+                </div>
+                
+                {/* Top Right - Category, Status, and Date */}
+                <div className="flex flex-col items-end gap-2 text-right">
+                  <div className="flex items-center gap-2">
                     {ticket.category && (
                       <Badge variant="secondary">
                         <Tag className="size-3 mr-1" />
@@ -350,19 +353,12 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                           : 'Category'}
                       </Badge>
                     )}
+                    {getStatusBadge(ticket?.status)}
                   </div>
                   
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <CalendarClock className="size-4" />
-                      <span>Created {ticket?.createdAt ? formatDateTimeSmart(ticket.createdAt) : 'Loading...'}</span>
-                    </div>
-                    {ticket?.updatedAt && ticket.updatedAt !== ticket.createdAt && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="size-4" />
-                        <span>Updated {formatDateTimeSmart(ticket.updatedAt)}</span>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <CalendarClock className="size-4" />
+                    <span>{ticket?.createdAt ? formatDateTimeSmart(ticket.createdAt) : 'Loading...'}</span>
                   </div>
                 </div>
               </div>
@@ -393,7 +389,6 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 <TabsList>
                   <TabsTrigger value="activity">Activity</TabsTrigger>
                   <TabsTrigger value="notes">Notes</TabsTrigger>
-                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="activity" className="mt-4">
@@ -545,125 +540,10 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   )}
                 </TabsContent>
                 
-                <TabsContent value="attachments" className="mt-4">
-                  {loadingAttachments ? (
-                    <div className="grid gap-2">
-                      <Skeleton className="h-16 w-full" />
-                      <Skeleton className="h-16 w-3/4" />
-                    </div>
-                  ) : attachments.length === 0 ? (
-                    <div className="text-xs text-muted-foreground">No attachments</div>
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {attachments.map((att) => (
-                        <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
-                          {/* Thumbnail/Icon */}
-                          <div className="w-full h-full flex items-center justify-center">
-                            {isImage(att.mimeType) ? (
-                              <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
-                            ) : isVideo(att.mimeType) ? (
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <Video className="size-12" />
-                                <span className="text-xs font-medium">VIDEO</span>
-                              </div>
-                            ) : isPdf(att.mimeType) ? (
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <FileText className="size-12" />
-                                <span className="text-xs font-medium">PDF</span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <File className="size-12" />
-                                <span className="text-xs font-medium">FILE</span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Overlay Actions */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                            <Button 
-                              size="sm" 
-                              variant="secondary" 
-                              className="bg-white/90 hover:bg-white text-black border-0"
-                              onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
-                            >
-                              <Eye className="size-4" />
-                            </Button>
-                            <Button 
-                              asChild 
-                              size="sm" 
-                              variant="secondary"
-                              className="bg-white/90 hover:bg-white text-black border-0"
-                            >
-                              <a href={att.url} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="size-4" />
-                              </a>
-                            </Button>
-                          </div>
-                          
-                          {/* File size indicator */}
-                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                            {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
 
-          {/* Location */}
-          {(ticket.location?.coordinates || ticket.coordinates || ticket.location) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="size-5 text-blue-600" />
-                  Incident Location
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Map Action */}
-                  {(ticket.location?.coordinates || ticket.coordinates) && (
-                    <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
-                          <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            Precise Location Available
-                          </p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            GPS coordinates captured from the report
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={openInGoogleMaps}
-                        className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
-                      >
-                        <ExternalLink className="size-4 mr-2" />
-                        View on Map
-                      </Button>
-                    </div>
-                  )}
-                  
-                  {/* No location fallback */}
-                  {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <MapPin className="size-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No location information available</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
         </div>
 
@@ -687,74 +567,59 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 {/* Removed created/updated timestamp from this card as requested */}
               </div>
               
-              {/* Status Update Form */}
+              {/* Status Action Buttons */}
               <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Update Status:</label>
-                  <Select value={newStatus} onValueChange={setNewStatus} disabled={isClosed}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Change status..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">
-                        <div className="flex items-center gap-2">
-                          <div className="size-2 rounded-full bg-sky-500"></div>
-                          Open
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="in_progress">
-                        <div className="flex items-center gap-2">
-                          <div className="size-2 rounded-full bg-amber-500"></div>
-                          In Progress
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="resolved">
-                        <div className="flex items-center gap-2">
-                          <div className="size-2 rounded-full bg-emerald-500"></div>
-                          Resolved
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="closed" disabled>
-                        <div className="flex items-center gap-2 opacity-60">
-                          <div className="size-2 rounded-full bg-neutral-500"></div>
-                          Closed
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {newStatus === "resolved" && (
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Resolution Note:</label>
-                    <Textarea
-                      placeholder="How was this resolved?"
-                      value={resolutionNote}
-                      onChange={(e) => setResolutionNote(e.target.value)}
-                      rows={2}
-                      className="text-sm"
-                    />
+                {ticket?.status === "assigned" && (
+                  <Button 
+                    onClick={handleStartWork}
+                    disabled={updatingStatus || isClosed}
+                    className="w-full h-9"
+                    size="sm"
+                  >
+                    {updatingStatus ? (
+                      <>
+                        <Clock className="size-3 mr-2 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="size-3 mr-2" />
+                        Start Work
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {ticket?.status === "in_progress" && (
+                  <Button 
+                    onClick={handleMarkResolved}
+                    disabled={updatingStatus || isClosed}
+                    className="w-full h-9"
+                    size="sm"
+                    variant="default"
+                  >
+                    {updatingStatus ? (
+                      <>
+                        <Clock className="size-3 mr-2 animate-spin" />
+                        Marking...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="size-3 mr-2" />
+                        Mark as Resolved
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {ticket?.status === "resolved" && (
+                  <div className="p-3 bg-muted/30 rounded-lg border text-center">
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Clock className="size-4" />
+                      <span>Awaiting user confirmation</span>
+                    </div>
                   </div>
                 )}
-                
-                <Button 
-                  onClick={handleStatusUpdate}
-                  disabled={!newStatus || updatingStatus || newStatus === ticket?.status || isClosed}
-                  className="w-full h-9"
-                  size="sm"
-                >
-                  {updatingStatus ? (
-                    <>
-                      <Clock className="size-3 mr-2 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="size-3 mr-2" />
-                      Update Status
-                    </>
-                  )}
-                </Button>
               </div>
               
               <Separator />
@@ -771,40 +636,6 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
             </CardContent>
           </Card>
 
-          {/* Assigned Teams */}
-          {ticket.assignedTeams && ticket.assignedTeams.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="size-4" />
-                  Assigned Teams
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {ticket.assignedTeams.map((team) => (
-                    <div key={team._id} className="p-3 bg-muted/30 rounded-lg border">
-                      <div className="font-medium text-sm flex items-center gap-2">
-                        <Users className="size-3 text-muted-foreground" />
-                        {team.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {team.areas && team.areas.length > 0
-                          ? team.areas.reduce((acc, area, idx) =>
-                              acc + (idx > 0 ? "; " : "") + `${area.zone}, ${area.city}`, "")
-                          : "No areas assigned"}
-                      </div>
-                      {team.isActive && (
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          Active Team
-                        </Badge>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Reporter Info */}
           {ticket.reportedBy && (
@@ -877,6 +708,132 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               </CardContent>
             </Card>
           )}
+
+          {/* Location Card */}
+          {(ticket.location?.coordinates || ticket.coordinates || ticket.location) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="size-5 text-blue-600" />
+                  Incident Location
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Map Action */}
+                  {(ticket.location?.coordinates || ticket.coordinates) && (
+                    <div className="flex items-center justify-between p-2 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-blue-100 dark:bg-blue-900 rounded-full">
+                          <MapPin className="size-3 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                            GPS Location
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            Precise coordinates available
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openInGoogleMaps}
+                        className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 h-7 px-2"
+                      >
+                        <ExternalLink className="size-3 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* No location fallback */}
+                  {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <MapPin className="size-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No location information available</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Attachments Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="size-5 text-green-600" />
+                Attachments
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingAttachments ? (
+                <div className="grid gap-2">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-3/4" />
+                </div>
+              ) : attachments.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-4">No attachments</div>
+              ) : (
+                <div className="grid gap-3">
+                  {attachments.map((att) => (
+                    <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
+                      {/* Thumbnail/Icon */}
+                      <div className="w-full h-full flex items-center justify-center">
+                        {isImage(att.mimeType) ? (
+                          <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                        ) : isVideo(att.mimeType) ? (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <Video className="size-8" />
+                            <span className="text-xs font-medium">VIDEO</span>
+                          </div>
+                        ) : isPdf(att.mimeType) ? (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <FileText className="size-8" />
+                            <span className="text-xs font-medium">PDF</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                            <File className="size-8" />
+                            <span className="text-xs font-medium">FILE</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Overlay Actions */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="bg-white/90 hover:bg-white text-black border-0"
+                          onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
+                        >
+                          <Eye className="size-4" />
+                        </Button>
+                        <Button 
+                          asChild 
+                          size="sm" 
+                          variant="secondary"
+                          className="bg-white/90 hover:bg-white text-black border-0"
+                        >
+                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="size-4" />
+                          </a>
+                        </Button>
+                      </div>
+                      
+                      {/* File size indicator */}
+                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
       
