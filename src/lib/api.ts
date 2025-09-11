@@ -2,16 +2,16 @@
 
 import axios from "axios";
 import Cookies from "js-cookie";
-import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus } from "./types";
+import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jalnafirst-03821e1b4515.herokuapp.com";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  // We send Bearer tokens via Authorization header; do not send cross-site cookies
-  withCredentials: false,
+  withCredentials: true, // Enable cookies for secure auth
 });
 
+// Add request interceptor for Bearer token (fallback for current implementation)
 api.interceptors.request.use((config) => {
   const token = Cookies.get("ss_token");
   if (token) {
@@ -20,6 +20,24 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Add response interceptor for centralized error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401 && typeof window !== "undefined") {
+      // Clear any existing token
+      try { 
+        Cookies.remove("ss_token"); 
+      } catch {}
+      
+      // Redirect to login with current path as next parameter
+      const next = window.location.pathname || "/";
+      window.location.href = `/login?next=${encodeURIComponent(next)}`;
+    }
+    return Promise.reject(error);
+  }
+);
 
 export function setAuthToken(token: string | null) {
   if (token) Cookies.set("ss_token", token, { sameSite: "lax" });
@@ -67,10 +85,25 @@ export async function createAdmin(payload: {
   lastName: string;
   role?: "admin" | "superadmin";
 }) {
-  // TODO: Confirm endpoint for creating admin; using /api/admin/create for now if available.
-  // If superadmin-only create endpoint exists, adjust accordingly.
+  // Based on api.md - Create Admin endpoint (Only for Super admin)
   const res = await api.post("/api/admin/create", payload);
-  return res.data;
+  return res.data as {
+    message: string;
+    admin: {
+      id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+      role: string;
+      privileges: {
+        canManageUsers: boolean;
+        canManageContent: boolean;
+        canManageSettings: boolean;
+        canUploadDocs: boolean;
+        canEditPhoneNumbers: boolean;
+      };
+    };
+  };
 }
 
 // Setup & Superadmin (from docs #4-#9)
@@ -115,6 +148,16 @@ export async function getUserById(id: string): Promise<User> {
   return res.data.user as User;
 }
 
+// User Stats (based on api.md)
+export async function getUserStats(): Promise<{
+  totalUsers: number;
+  usersThisWeek: number;
+  usersThisMonth: number;
+}> {
+  const res = await api.get("/api/admin/user-stats");
+  return res.data;
+}
+
 // Agency Contacts
 export type AgencyContactPayload = {
   name: string;
@@ -153,15 +196,20 @@ export async function deleteAgencyContact(id: string) {
   return res.data;
 }
 
-// Profile (from docs #12-#15)
+// Profile (based on api.md)
 export async function updateProfile(payload: {
+  firstName?: string;
+  lastName?: string;
+  phoneNumber?: string;
+  description?: string;
+  education?: string;
+  dateOfBirth?: string;
   location?: {
     city?: string;
     state?: string;
     country?: string;
     coordinates?: { latitude: number; longitude: number };
   };
-  aadhaarNumber?: string | number;
   address?: {
     line1?: string;
     line2?: string;
@@ -170,11 +218,13 @@ export async function updateProfile(payload: {
     zipCode?: string;
     country?: string;
   };
-  education?: string;
+  profileVisibility?: "public" | "private";
+  preferredLanguage?: "en" | "hi" | "mr";
+  aadhaarNumber?: string | number;
   occupation?: string;
   businessDetails?: { businessType?: string };
 }) {
-  const res = await api.put("/api/profile", payload);
+  const res = await api.put("/api/users/me", payload);
   return res.data as { message: string; user: User };
 }
 
@@ -283,13 +333,302 @@ export async function adminAddNote(id: string, note: string) {
 
 // Ticket change history (admin)
 export async function adminGetTicketHistory(id: string) {
-  const res = await api.get(`/api/tickets/admin/${id}/history`);
+  const res = await api.get(`/api/tickets/${id}/history`);
   return res.data;
 }
 
-// TODO: Notices/Circulars endpoints are not in the doc. Add once available.
+// Staff Management (based on api.md)
+export async function createStaff(payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phoneNumber?: string;
+}) {
+  const res = await api.post("/api/staff", payload);
+  return res.data as {
+    message: string;
+    staff: User;
+  };
+}
 
-// Tickets admin stats
+export async function getStaff(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const res = await api.get("/api/staff", { params });
+  return res.data as {
+    staff: User[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+    };
+  };
+}
+
+export async function getTeamsWithSearch(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  zone?: string;
+  isActive?: boolean;
+}) {
+  const res = await api.get("/api/teams", { params });
+  return res.data as { teams: Team[]; pagination?: { currentPage: number; totalPages: number; total: number } };
+}
+
+export async function getStaffById(id: string) {
+  const res = await api.get(`/api/staff/${id}`);
+  return res.data.staff as User;
+}
+
+export async function updateStaff(id: string, payload: Partial<{
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  isActive: boolean;
+}>) {
+  const res = await api.put(`/api/staff/${id}`, payload);
+  return res.data;
+}
+
+
+export async function createTeam(payload: {
+  name: string;
+  description: string;
+  areas: Array<{
+    zone: string;
+    area: string;
+    city: string;
+    state: string;
+  }>;
+}) {
+  const res = await api.post("/api/teams", payload);
+  return res.data as {
+    message: string;
+    team: Team;
+  };
+}
+
+export async function getTeams(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  zone?: string;
+  isActive?: boolean;
+}) {
+  const res = await api.get("/api/teams", { params });
+  return res.data as {
+    teams: Team[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+    };
+  };
+}
+
+export async function getTeamById(id: string): Promise<Team | null> {
+  try {
+    const res = await api.get(`/api/teams/${id}`);
+    // Prefer res.data.team, but fall back to res.data if shape differs
+    return (res.data?.team ?? res.data) as Team;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function addEmployeesToTeam(teamId: string, employees: string[]) {
+  const res = await api.post(`/api/teams/${teamId}/employees`, { employees });
+  return res.data as {
+    message: string;
+    team: Team;
+  };
+}
+
+export async function removeEmployeeFromTeam(teamId: string, employeeId: string) {
+  const res = await api.delete(`/api/teams/${teamId}/employees/${employeeId}`);
+  return res.data;
+}
+
+export async function updateTeamLeader(teamId: string, leaderId: string) {
+  const res = await api.put(`/api/teams/${teamId}/leader`, { leaderId });
+  return res.data as {
+    message: string;
+    team: Team;
+  };
+}
+
+// Fetch team leader details
+export async function getTeamLeader(teamId: string): Promise<User | null> {
+  try {
+    const res = await api.get(`/api/teams/${teamId}/leader`);
+    const data = res.data as { leader?: User; user?: User; staff?: User; data?: User };
+    const leader = data?.leader ?? data?.user ?? data?.staff ?? data?.data ?? null;
+    return leader ?? null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Get current user's team info from user object
+export async function getCurrentUserTeamInfo(): Promise<{ isTeamLead: boolean; team?: Team } | null> {
+  try {
+    const currentUser = await getCurrentUser();
+    if (currentUser.role !== 'staff' || !currentUser.teams?.length) {
+      return { isTeamLead: false };
+    }
+
+    // Find the team where user is a leader
+    const leaderTeam = currentUser.teams.find(team => team.isLeader);
+    
+    if (!leaderTeam) {
+      return { isTeamLead: false };
+    }
+
+    // Get full team details
+    const fullTeam = await getTeamById(leaderTeam.id);
+    
+    return {
+      isTeamLead: true,
+      team: fullTeam || undefined
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+// Get team data for team lead view (supports { teams: Team[] } or { team: Team })
+export async function getMyTeam(): Promise<{ team?: Team; teams?: Team[] }> {
+  const res = await api.get("/api/teams/my");
+  return res.data as { team?: Team; teams?: Team[] };
+}
+
+export async function assignTeamsToTicket(ticketId: string, teamIds: string[], mode: "add" | "replace" = "add") {
+  const res = await api.post(`/api/tickets/admin/${ticketId}/assign-teams`, { teamIds, mode });
+  return res.data as {
+    message: string;
+    ticket: Ticket;
+  };
+}
+
+export async function getTeamTicketsMinimal(params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const res = await api.get("/api/tickets/team/minimal", { params });
+  return res.data as {
+    tickets: Array<{
+      id: string;
+      description: string;
+      coordinates?: { latitude: number; longitude: number };
+      attachments: unknown[];
+      status: string;
+      createdAt: string;
+    }>;
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+    };
+  };
+}
+
+// Get a specific team ticket by ID from the team tickets list
+export async function getTeamTicketById(ticketId: string) {
+  const res = await api.get("/api/tickets/team/minimal");
+  const tickets = res.data.tickets as Array<{
+    id: string;
+    description: string;
+    coordinates?: { latitude: number; longitude: number };
+    attachments: unknown[];
+    status: string;
+    createdAt: string;
+  }>;
+  const ticket = tickets.find(t => t.id === ticketId);
+  return ticket ? { ticket } : null;
+}
+
+export async function markTicketComplete(ticketId: string) {
+  const res = await api.post(`/api/tickets/${ticketId}/complete`);
+  return res.data as {
+    message: string;
+    ticket: Ticket;
+  };
+}
+
+// Update ticket status (for staff) - using team endpoint
+export async function updateTicketStatusTeam(ticketId: string, payload: {
+  status: "in_progress" | "pending_user" | "pending_admin" | "resolved";
+}) {
+  const res = await api.put(`/api/tickets/team/${ticketId}/status`, payload);
+  return res.data as { message: string; ticket?: Ticket };
+}
+
+// Update ticket status (for admin)
+export async function updateTicketStatus(ticketId: string, payload: {
+  status?: string;
+  resolutionNote?: string;
+  slaDueDate?: string;
+}) {
+  const res = await api.put(`/api/tickets/admin/${ticketId}`, payload);
+  return res.data as { message: string; ticket: Ticket };
+}
+
+
+export async function uploadTicketAttachments(ticketId: string, files: File[], mode: "add" | "replace" = "add") {
+  const form = new FormData();
+  files.forEach(file => form.append("attachments", file));
+  const res = await api.post(`/api/tickets/${ticketId}/attachments?mode=${mode}`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data as {
+    message: string;
+    attachments: Array<{
+      filename: string;
+      url: string;
+      publicId: string;
+      size: number;
+      mimeType: string;
+      _id: string;
+    }>;
+  };
+}
+
+export async function getTicketAttachments(ticketId: string) {
+  const res = await api.get(`/api/tickets/${ticketId}/attachments`);
+  return res.data as {
+    attachments: Array<{
+      filename: string;
+      url: string;
+      publicId: string;
+      size: number;
+      mimeType: string;
+      _id: string;
+    }>;
+  };
+}
+
+export async function deleteTicketAttachment(ticketId: string, attachmentId: string) {
+  const res = await api.delete(`/api/tickets/${ticketId}/attachments/${attachmentId}`);
+  return res.data as {
+    message: string;
+    attachments: unknown[];
+  };
+}
+
+
+export async function getTicketCategories() {
+  const res = await api.get("/api/tickets/categories");
+  return res.data as {
+    categories: string[];
+  };
+}
+
+
 export type TicketStats = {
   overall?: { total?: number; open?: number; inProgress?: number; resolved?: number; closed?: number };
   byCategory?: Array<{ _id: string; count: number }>;
@@ -298,5 +637,141 @@ export type TicketStats = {
 export async function adminGetTicketStats(): Promise<TicketStats> {
   const res = await api.get("/api/tickets/admin/stats");
   return res.data as TicketStats;
+}
+
+// Categories API
+export async function getCategories(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const res = await api.get("/api/categories", { params });
+  return res.data as {
+    categories: Category[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+    };
+  };
+}
+
+export async function getCategoryById(id: string) {
+  const res = await api.get(`/api/categories/${id}`);
+  return res.data.category as Category;
+}
+
+export async function getCategoryWithSubcategories(id: string) {
+  const [categoryRes, subcategoriesRes] = await Promise.all([
+    api.get(`/api/categories/${id}`),
+    api.get(`/api/subcategories?category=${id}`)
+  ]);
+  
+  return {
+    category: categoryRes.data.category as Category,
+    subcategories: subcategoriesRes.data.subcategories as SubCategory[]
+  };
+}
+
+export async function createCategory(payload: {
+  name: string;
+  description: string;
+  team?: string;
+}) {
+  const res = await api.post("/api/categories", payload);
+  return res.data as {
+    message: string;
+    category: Category;
+  };
+}
+
+export async function updateCategory(id: string, payload: {
+  name?: string;
+  description?: string;
+  team?: string;
+}) {
+  const res = await api.put(`/api/categories/${id}`, payload);
+  return res.data as {
+    message: string;
+    category: Category;
+  };
+}
+
+export async function deleteCategory(id: string) {
+  const res = await api.delete(`/api/categories/${id}`);
+  return res.data as {
+    message: string;
+  };
+}
+
+export async function getCategoriesGroupedByTeam() {
+  const res = await api.get("/api/categories/grouped-by-team");
+  return res.data as {
+    categories: {
+      global: Category[];
+      teams: {
+        [teamId: string]: {
+          teamId: string;
+          teamName: string;
+          categories: Category[];
+        };
+      };
+    };
+    total: number;
+  };
+}
+
+// SubCategories API
+export async function getSubCategories(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+}) {
+  const res = await api.get("/api/subcategories", { params });
+  return res.data as {
+    subcategories: SubCategory[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+    };
+  };
+}
+
+export async function getSubCategoryById(id: string) {
+  const res = await api.get(`/api/subcategories/${id}`);
+  return res.data.subcategory as SubCategory;
+}
+
+export async function createSubCategory(payload: {
+  name: string;
+  description: string;
+  category: string;
+}) {
+  const res = await api.post("/api/subcategories", payload);
+  return res.data as {
+    message: string;
+    subcategory: SubCategory;
+  };
+}
+
+export async function updateSubCategory(id: string, payload: {
+  name?: string;
+  description?: string;
+  category?: string;
+}) {
+  const res = await api.put(`/api/subcategories/${id}`, payload);
+  return res.data as {
+    message: string;
+    subcategory: SubCategory;
+  };
+}
+
+export async function deleteSubCategory(id: string) {
+  const res = await api.delete(`/api/subcategories/${id}`);
+  return res.data as {
+    message: string;
+  };
 }
 

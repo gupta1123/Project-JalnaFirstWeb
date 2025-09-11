@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, User as UserIcon, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Download, Image, Video, File } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
-import type { Ticket, TicketStatus, User } from "@/lib/types";
-import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, getUserById } from "@/lib/api";
+import type { Ticket, TicketStatus, User, Team } from "@/lib/types";
+import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, getUserById, assignTeamsToTicket, getTeams, getTicketAttachments } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const validStatuses: TicketStatus[] = ["open", "in_progress", "resolved", "closed"];
+
+// Helper function to format changed by information
+const formatChangedBy = (changedBy: string | User | undefined) => {
+  if (!changedBy) return 'Unknown User';
+
+  if (typeof changedBy === 'string') return changedBy;
+
+  // Handle User type
+  if (changedBy.fullName) return changedBy.fullName;
+  if (changedBy.firstName && changedBy.lastName) {
+    return `${changedBy.firstName} ${changedBy.lastName}`;
+  }
+  if (changedBy.email) return changedBy.email;
+
+  return 'Unknown User';
+};
 
 export default function ComplaintDetailPage() {
   const params = useParams<{ id: string }>();
@@ -44,12 +60,12 @@ export default function ComplaintDetailPage() {
   );
   const requesterUser = requester as User | undefined;
 
-  // Ticket change history
-  type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: { fullName?: string }; changedAt?: string };
+
+  type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: string; changedAt?: string };
   type TicketHistory = { ticketNumber?: string; title?: string; changeHistory?: ChangeItem[] };
-  const { data: historyResp, mutate: mutateHistory } = useSWR<TicketHistory>(id ? ["ticket-history-admin", id] : null, () => adminGetTicketHistory(id), { revalidateOnFocus: false });
+  const { data: historyResp, mutate: mutateHistory } = useSWR<TicketHistory>(id ? ["ticket-history-new", id] : null, () => adminGetTicketHistory(id), { revalidateOnFocus: false });
   const historyItems: ChangeItem[] = useMemo(() => (historyResp?.changeHistory ?? [])
-    // Hide no-op status changes where oldValue === newValue
+    
     .filter((h) => !(h.field === 'status' && (h.oldValue ?? '') === (h.newValue ?? '')))
     .slice()
     .sort((a, b) => {
@@ -58,7 +74,7 @@ export default function ComplaintDetailPage() {
     return tb - ta; // newest first
   }), [historyResp]);
 
-  // Keep status select in sync with loaded ticket
+ 
   useEffect(() => {
     if (ticket?.status) setStatus(ticket.status);
   }, [ticket?.status]);
@@ -68,9 +84,51 @@ export default function ComplaintDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [assignTeamsOpen, setAssignTeamsOpen] = useState(false);
+
+
+  const { data: teamsData } = useSWR("teams", () => getTeams({ page: 1, limit: 100 }));
+  const teams: Team[] = teamsData?.teams ?? [];
 
   const created = useMemo(() => formatDateTimeSmart(ticket?.createdAt), [ticket?.createdAt]);
   const updated = useMemo(() => formatDateTimeSmart(ticket?.updatedAt), [ticket?.updatedAt]);
+  const isClosed = ticket?.status === 'closed';
+
+
+  const { data: attachmentsResp, isLoading: isLoadingAttachments } = useSWR(
+    id ? ["ticket-attachments-new", id] : null,
+    () => getTicketAttachments(id),
+    { revalidateOnFocus: false }
+  );
+  const attachments = attachmentsResp?.attachments ?? [] as Array<{ _id: string; filename: string; url: string; size: number; mimeType: string; }>;
+
+
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+  } | null>(null);
+  const isImage = (m?: string) => Boolean(m && m.startsWith("image/"));
+  const isVideo = (m?: string) => Boolean(m && m.startsWith("video/"));
+  const isPdf = (m?: string) => m === "application/pdf";
+
+  const handleAssignTeams = async (teamIds: string[]) => {
+    if (!id) return;
+    setSubmitting(true);
+    try {
+      await assignTeamsToTicket(id, teamIds, 'replace');
+      toast.success("Teams assigned successfully");
+      mutate(); 
+      setAssignTeamsOpen(false);
+    } catch (error) {
+      toast.error("Failed to assign teams");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   function statusBadgeClass(s: TicketStatus) {
     if (s === "open") return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
@@ -116,9 +174,6 @@ export default function ComplaintDetailPage() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Ticket</CardTitle>
-      </CardHeader>
       <CardContent className="grid gap-4 overflow-x-hidden">
         {isLoading && (
           <div className="grid gap-3">
@@ -130,10 +185,10 @@ export default function ComplaintDetailPage() {
         )}
         {!isLoading && ticket && (
           <div className="grid gap-4">
-            {/* Top summary */}
+    
             <div className="rounded-lg border p-4 grid gap-3 overflow-x-hidden">
               <div className="grid gap-3 md:grid-cols-[1fr_auto] items-start">
-                {/* Left: identifier */}
+           
                 <div className="flex items-center gap-2 text-sm">
                   <Hash className="size-4 text-muted-foreground" />
                   <span className="font-medium">{ticket.ticketNumber ?? ticket._id}</span>
@@ -142,11 +197,17 @@ export default function ComplaintDetailPage() {
                   </Button>
                 </div>
 
-                {/* Right: badges + add note */}
                 <div className="flex flex-col gap-2 md:items-end">
                   <div className="flex flex-wrap gap-2 justify-end">
                     {ticket.category && (
-                      <Badge variant="secondary" className="capitalize flex items-center gap-1"><Tag className="size-3.5" /> {ticket.category}</Badge>
+                      <Badge variant="secondary" className="capitalize flex items-center gap-1">
+                        <Tag className="size-3.5" />
+                        {typeof ticket.category === 'string'
+                          ? ticket.category
+                          : typeof ticket.category === 'object' && ticket.category && 'name' in ticket.category
+                          ? (ticket.category as { name: string }).name
+                          : 'Category'}
+                      </Badge>
                     )}
                     {ticket.priority && (
                       <Badge className="capitalize flex items-center gap-1"><Flag className="size-3.5" /> {ticket.priority}</Badge>
@@ -167,23 +228,96 @@ export default function ComplaintDetailPage() {
                   ))}
             </div>
               )}
-              {/* Bottom-right controls */}
+           
               <div className="flex flex-wrap gap-2 justify-end pt-2">
-                <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)}>
+                <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)} disabled={isClosed}>
                   <SelectTrigger className="h-8 w-[180px] sm:w-[220px]">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
                     {validStatuses.map((s) => (
-                      <SelectItem key={s} value={s} className="capitalize">{s.replace(/_/g, " ")}</SelectItem>
+                      <SelectItem key={s} value={s} className="capitalize" disabled={s === 'closed'}>
+                        {s.replace(/_/g, " ")}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" onClick={saveStatus} disabled={submitting}>Save</Button>
+                <Button size="sm" onClick={saveStatus} disabled={submitting || isClosed}>Save</Button>
             </div>
             </div>
 
-            {/* Compact controls moved to top summary; removed section to save space */}
+         
+            <div className="rounded-lg border p-4 grid gap-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Users className="size-4 text-muted-foreground" /> 
+                  Assigned Teams
+                </div>
+                {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="capitalize">
+                      {ticket.assignedTeams.length} team{ticket.assignedTeams.length !== 1 ? 's' : ''}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAssignTeamsOpen(true)}
+                      disabled={submitting}
+                    >
+                      <Users className="size-3 mr-1" />
+                      Manage
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAssignTeamsOpen(true)}
+                    disabled={submitting}
+                  >
+                    <Plus className="size-3 mr-1" />
+                    Assign Teams
+                  </Button>
+                )}
+              </div>
+              
+              {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {ticket.assignedTeams.map((team) => (
+                    <div key={team._id} className="rounded border p-3 bg-muted/30">
+                      <div className="flex items-start justify-between mb-1">
+                        <div className="font-medium text-sm">{team.name}</div>
+                        <Badge variant="outline" className="text-xs">Active</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {team.areas && team.areas.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {team.areas.slice(0, 2).map((area, idx) => (
+                              <div key={idx} className="flex items-center gap-1">
+                                <MapPin className="size-3" />
+                                <span>{area.zone}, {area.city}</span>
+                              </div>
+                            ))}
+                            {team.areas.length > 2 && (
+                              <div className="text-xs opacity-70">+{team.areas.length - 2} more areas</div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="size-3" />
+                            <span>No specific areas</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  No teams assigned to this complaint
+                </div>
+              )}
+            </div>
 
             {/* Two-column layout: left Tabs (Notes/Activity), right Details */}
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
@@ -196,36 +330,69 @@ export default function ComplaintDetailPage() {
                       <TabsList>
                         <TabsTrigger value="activity">Activity</TabsTrigger>
                         <TabsTrigger value="notes">Notes</TabsTrigger>
+                        <TabsTrigger value="attachments">Attachments</TabsTrigger>
                       </TabsList>
                       <TabsContent value="activity" className="mt-4">
                         {historyItems.length === 0 ? (
-                          <div className="text-xs text-muted-foreground">No history yet</div>
+                          <div className="text-center py-8">
+                            <div className="rounded-full bg-muted p-3 w-fit mx-auto mb-3">
+                              <Flag className="size-6 text-muted-foreground" />
+                            </div>
+                            <div className="text-sm text-muted-foreground">No activity yet</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Changes and updates will appear here
+                            </div>
+                          </div>
                         ) : (
                           <div className="relative">
-                            <div className="absolute left-3 top-0 bottom-0 w-px bg-border" aria-hidden />
-                            <div className="grid gap-3">
-                              {historyItems.map((h) => (
-                                <div key={h.id} className="relative pl-8">
-                                  <div className="absolute left-2.5 top-0.5 h-2.5 w-2.5 rounded-full bg-foreground" />
-                                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                    <Flag className="size-3.5" />
-                                    <span className="capitalize">{h.changeType?.replace(/_/g, " ") ?? "change"}</span>
-                                    {h.changedAt && <span>• {formatDateTimeSmart(h.changedAt)}</span>}
-                                  </div>
-                                  <div className="text-sm">
-                                    {h.field === 'status' ? (
-                                      <>
-                                        Status changed from{' '}
-                                        <Badge className={`ml-1 capitalize border ${statusBadgeClass((h.oldValue as TicketStatus) ?? 'open')}`}>
-                                          {(h.oldValue ?? '').toString().replace(/_/g, ' ')}
+                            <div className="absolute left-4 top-0 bottom-0 w-px bg-border" aria-hidden />
+                            <div className="space-y-4">
+                              {historyItems.map((h, index) => (
+                                <div key={h.id} className="relative pl-10">
+                                  <div className={`absolute left-2.5 top-1 h-3 w-3 rounded-full border-2 border-background ${
+                                    h.field === 'status' ? 'bg-blue-500' : 'bg-muted-foreground'
+                                  }`} />
+                                  
+                                  <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">
+                                          {h.changeType?.replace(/_/g, " ") ?? "Change"}
                                         </Badge>
-                                        {' '}to{' '}
-                                        <Badge className={`capitalize border ${statusBadgeClass((h.newValue as TicketStatus) ?? 'open')}`}>
-                                          {(h.newValue ?? '').toString().replace(/_/g, ' ')}
-                                        </Badge>
-                                      </>
-                                    ) : (
-                                      h.description ?? `${h.field ?? 'field'} updated`
+                                        {h.field && (
+                                          <span className="text-xs text-muted-foreground">
+                                            • {h.field}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {h.changedAt && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {formatDateTimeSmart(h.changedAt)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-sm">
+                                      {h.field === 'status' ? (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span>Status changed from</span>
+                                          <Badge variant="outline" className={`capitalize ${statusBadgeClass((h.oldValue as TicketStatus) ?? 'open')}`}>
+                                            {(h.oldValue ?? '').toString().replace(/_/g, ' ')}
+                                          </Badge>
+                                          <span>to</span>
+                                          <Badge variant="outline" className={`capitalize ${statusBadgeClass((h.newValue as TicketStatus) ?? 'open')}`}>
+                                            {(h.newValue ?? '').toString().replace(/_/g, ' ')}
+                                          </Badge>
+                                        </div>
+                                      ) : (
+                                        <div>{h.description ?? `${h.field ?? 'Field'} updated`}</div>
+                                      )}
+                                    </div>
+                                    
+                                    {h.changedBy && (
+                                      <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
+                                        Changed by: {formatChangedBy(h.changedBy)}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -240,12 +407,84 @@ export default function ComplaintDetailPage() {
                             {ticket.adminNotes.map((n, i) => (
                               <div key={i} className="text-xs text-muted-foreground border rounded p-2">
                                 <div className="text-foreground text-sm">{n.note}</div>
-                                {n.addedAt && <div className="opacity-70 mt-1">{formatDateTimeSmart(n.addedAt)}</div>}
+                                {n.addedAt && (
+                              <div className="opacity-70 mt-1">
+                                {formatDateTimeSmart(n.addedAt)}
+                                {n.addedBy && (
+                                  <span> • by {formatChangedBy(n.addedBy)}</span>
+                                )}
+                              </div>
+                            )}
                   </div>
                 ))}
                           </div>
                         ) : (
                           <div className="text-xs text-muted-foreground">No notes yet</div>
+                        )}
+                      </TabsContent>
+                      <TabsContent value="attachments" className="mt-4">
+                        {isLoadingAttachments ? (
+                          <div className="grid gap-2">
+                            <Skeleton className="h-16 w-full" />
+                            <Skeleton className="h-16 w-3/4" />
+                          </div>
+                        ) : attachments.length === 0 ? (
+                          <div className="text-xs text-muted-foreground">No attachments</div>
+                        ) : (
+                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {attachments.map((att) => (
+                              <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
+                                {/* Thumbnail/Icon */}
+                                <div className="w-full h-full flex items-center justify-center">
+                                  {isImage(att.mimeType) ? (
+                                    <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                                  ) : isVideo(att.mimeType) ? (
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <Video className="size-12" />
+                                      <span className="text-xs font-medium">VIDEO</span>
+                                    </div>
+                                  ) : isPdf(att.mimeType) ? (
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <FileText className="size-12" />
+                                      <span className="text-xs font-medium">PDF</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                      <File className="size-12" />
+                                      <span className="text-xs font-medium">FILE</span>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Overlay Actions */}
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="secondary" 
+                                    className="bg-white/90 hover:bg-white text-black border-0"
+                                    onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
+                                  >
+                                    <Eye className="size-4" />
+                                  </Button>
+                                  <Button 
+                                    asChild 
+                                    size="sm" 
+                                    variant="secondary"
+                                    className="bg-white/90 hover:bg-white text-black border-0"
+                                  >
+                                    <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="size-4" />
+                                    </a>
+                                  </Button>
+                                </div>
+                                
+                                {/* File size indicator */}
+                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                  {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </TabsContent>
                     </Tabs>
@@ -256,7 +495,6 @@ export default function ComplaintDetailPage() {
               {/* RIGHT */}
               <div className="lg:col-span-4">
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle>Details</CardTitle></CardHeader>
                   <CardContent className="grid gap-3">
                     <div className="rounded-lg border p-4 grid gap-1">
                       <div className="text-sm font-medium mb-1 flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /> Requester</div>
@@ -327,7 +565,172 @@ export default function ComplaintDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Teams Dialog */}
+      <Dialog open={assignTeamsOpen} onOpenChange={setAssignTeamsOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Assign Teams to Ticket</DialogTitle>
+          </DialogHeader>
+          {ticket && (
+            <AssignTeamsForm
+              ticket={ticket}
+              teams={teams}
+              onAssign={handleAssignTeams}
+              submitting={submitting}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Attachment Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={(o) => { setPreviewOpen(o); if (!o) setPreviewAttachment(null); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewAttachment && isImage(previewAttachment.mimeType) && <Image className="size-5" />}
+              {previewAttachment && isVideo(previewAttachment.mimeType) && <Video className="size-5" />}
+              {previewAttachment && isPdf(previewAttachment.mimeType) && <FileText className="size-5" />}
+              {previewAttachment && !isImage(previewAttachment.mimeType) && !isVideo(previewAttachment.mimeType) && !isPdf(previewAttachment.mimeType) && <File className="size-5" />}
+              Preview
+            </DialogTitle>
+            {previewAttachment && (
+              <DialogDescription className="flex items-center justify-between">
+                <span>{previewAttachment.mimeType}</span>
+                <Button asChild size="sm" variant="outline">
+                  <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+                    <ExternalLink className="size-3" />
+                    Open Original
+                  </a>
+                </Button>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="mt-4 flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden" style={{ minHeight: '60vh' }}>
+            {previewAttachment ? (
+              isImage(previewAttachment.mimeType) ? (
+                <img src={previewAttachment.url} alt="Attachment" className="max-h-[60vh] max-w-full object-contain rounded" />
+              ) : isVideo(previewAttachment.mimeType) ? (
+                <video src={previewAttachment.url} controls className="max-h-[60vh] max-w-full rounded" />
+              ) : isPdf(previewAttachment.mimeType) ? (
+                <iframe src={previewAttachment.url} className="w-full h-[60vh] rounded border-0" />
+              ) : (
+                <div className="text-center py-12">
+                  <File className="size-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use &quot;Open Original&quot; to view the file
+                  </p>
+                </div>
+              )
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
+  );
+}
+
+// Assign Teams Form Component
+function AssignTeamsForm({
+  ticket,
+  teams,
+  onAssign,
+  submitting,
+}: {
+  ticket: Ticket;
+  teams: Team[];
+  onAssign: (teamIds: string[]) => Promise<void>;
+  submitting: boolean;
+}) {
+  const [selectedTeams, setSelectedTeams] = useState<string[]>(
+    ticket.assignedTeams?.map(t => t._id) || []
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onAssign(selectedTeams);
+  };
+
+  const toggleTeam = (teamId: string) => {
+    setSelectedTeams(prev =>
+      prev.includes(teamId)
+        ? prev.filter(id => id !== teamId)
+        : [...prev, teamId]
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-3">
+        <div className="p-3 bg-muted/50 rounded-lg">
+          <div className="text-sm font-medium">{ticket.ticketNumber || ticket._id}</div>
+          <div className="text-sm text-muted-foreground">{ticket.title}</div>
+          {ticket.location && (
+            <div className="text-xs text-muted-foreground mt-1">
+              {ticket.location.zone && `${ticket.location.zone}, `}
+              {ticket.location.city}, {ticket.location.state}
+            </div>
+          )}
+        </div>
+        
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Select Teams:</label>
+          {teams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No teams available</p>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {teams.map((team) => (
+                <div
+                  key={team._id}
+                  className={`
+                    p-3 rounded-lg border cursor-pointer transition-colors
+                    ${selectedTeams.includes(team._id)
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                    }
+                  `}
+                  onClick={() => toggleTeam(team._id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{team.name}</div>
+                    </div>
+                    <div className={`
+                      w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3
+                      ${selectedTeams.includes(team._id)
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-muted-foreground"
+                      }
+                    `}>
+                      {selectedTeams.includes(team._id) && (
+                        <Check className="size-3" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <DialogFooter className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {selectedTeams.length} team{selectedTeams.length !== 1 ? 's' : ''} selected
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={() => setSelectedTeams([])}>
+            Clear All
+          </Button>
+          <Button type="submit" disabled={submitting || selectedTeams.length === 0}>
+            {submitting ? "Assigning..." : "Assign Teams"}
+          </Button>
+        </div>
+      </DialogFooter>
+    </form>
   );
 }
 

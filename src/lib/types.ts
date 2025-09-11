@@ -13,7 +13,7 @@ export type User = {
   lastName: string;
   email: string;
   phoneNumber?: string;
-  role: "user" | "admin" | "superadmin";
+  role: "user" | "admin" | "superadmin" | "staff";
   profilePhoto?: string | null;
   profilePhotoUrl?: string | null;
   isEmailVerified: boolean;
@@ -21,14 +21,30 @@ export type User = {
   isBlocked: boolean;
   fullName?: string;
   adminPrivileges?: AdminPrivileges;
-  // Additional fields present in backend response
+  // Additional fields from backend response (api.md)
   location?: { city?: string; state?: string; country?: string; coordinates?: { latitude: number; longitude: number } };
   address?: { line1?: string; line2?: string; city?: string; state?: string; zipCode?: string; country?: string };
+  businessDetails?: { businessType?: string };
   profileVisibility?: "public" | "private";
-  preferredLanguage?: string;
+  preferredLanguage?: "en" | "hi" | "mr";
   lastActive?: string;
   createdAt?: string;
   updatedAt?: string;
+  // Profile fields
+  education?: string;
+  occupation?: string;
+  aadhaarNumber?: string;
+  dateOfBirth?: string;
+  description?: string;
+  plainTextPassword?: string; // Only in create responses
+  // Team information (from /api/users/me response)
+  teams?: Array<{
+    id: string;
+    name: string;
+    leaderId: string;
+    isLeader: boolean;
+    isMember: boolean;
+  }>;
 };
 
 export type AgencyContact = {
@@ -117,17 +133,131 @@ export type Ticket = {
   priority?: TicketPriority;
   status: TicketStatus;
   createdBy?: User | string;
-  location?: { zone?: string; city?: string; state?: string; area?: string };
+  reportedBy?: User;
+  coordinates?: { latitude: number; longitude: number }; // Direct coordinates for team tickets
+  location?: { 
+    zone?: string; 
+    city?: string; 
+    state?: string; 
+    area?: string;
+    coordinates?: { latitude: number; longitude: number };
+  };
   tags?: string[];
   escalated?: boolean;
   slaBreached?: boolean;
   isPublic?: boolean;
-  attachments?: unknown[];
+  attachments?: Array<{
+    filename: string;
+    url: string;
+    publicId: string;
+    size: number;
+    mimeType: string;
+    _id: string;
+  }>;
   internalNotes?: Array<{ note: string; addedAt?: string; addedBy?: User | string }>;
-  adminNotes?: Array<{ note: string; addedAt?: string; addedBy?: User | string }>;
+  adminNotes?: Array<{ note: string; addedAt?: string; addedBy?: User | string; _id?: string }>;
+  assignedTeams?: Array<{
+    _id: string;
+    name: string;
+    areas: Array<{
+      zone: string;
+      area: string;
+      city: string;
+      state: string;
+    }>;
+    isActive: boolean;
+  }>;
+  changeHistory?: Array<{
+    _id: string;
+    field?: string;
+    oldValue?: unknown;
+    newValue?: unknown;
+    changedBy?: User | string | {
+      id: string;
+      name: string;
+      role: string;
+      isTeamLeader?: boolean;
+      displayRole?: string;
+    };
+    changeType?: string;
+    description?: string;
+    changedAt?: string;
+  }>;
   age?: number;
   isOverdue?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  __v?: number;
+};
+
+// Team type (based on api.md)
+export type Team = {
+  _id: string;
+  name: string;
+  description: string;
+  employees: Array<User & { isLeader: boolean }>;
+  areas: Array<{
+    zone: string;
+    area: string;
+    city: string;
+    state: string;
+  }>;
+  isActive: boolean;
+  addedBy: User | string;
+  lastUpdatedBy: User | string;
+  leaderId?: string;
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
+};
+
+// Category type
+export type Category = {
+  id: string;
+  name: string;
+  description: string;
+  team?: {
+    _id: string;
+    name: string;
+  } | null;
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    fullName: string;
+    id: string;
+  };
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// SubCategory type
+export type SubCategory = {
+  id: string;
+  name: string;
+  description: string;
+  category: {
+    _id: string;
+    name: string;
+    team: string;
+    id: string;
+  };
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+    fullName: string;
+    id: string;
+  };
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
 };
 

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { api, adminGetTicketStats } from '@/lib/api';
+import { api, adminGetTicketStats, getUserStats, getCurrentUser, getTeamTicketsMinimal } from '@/lib/api';
 // removed charts
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
@@ -54,11 +54,15 @@ function useGreeting(): Greeting {
   return greeting;
 }
 
-function useOverview() {
-  const { data, error, isLoading } = useSWR<Overview>('/api/stats/overview', fetcher, { revalidateOnFocus: false });
+function useOverview(isAdmin: boolean) {
+  const { data, error, isLoading } = useSWR<Overview>(
+    isAdmin ? '/api/stats/overview' : null, 
+    fetcher, 
+    { revalidateOnFocus: false }
+  );
   type UsersCount = { users: unknown[]; pagination?: { totalUsers?: number } };
   const { data: usersData } = useSWR<UsersCount>(
-    ['/api/users', 'count'],
+    isAdmin ? ['/api/users', 'count'] : null,
     () => api.get('/api/users', { params: { page: 1, limit: 1 } }).then((r) => r.data),
     { revalidateOnFocus: false }
   );
@@ -91,8 +95,12 @@ function useOverview() {
 // weather removed
 
 /* -------------------- Ticket stats (admin) -------------------- */
-function useTicketStats() {
-  const { data, isLoading } = useSWR(['tickets-admin-stats'], adminGetTicketStats, { revalidateOnFocus: false });
+function useTicketStats(isAdmin: boolean) {
+  const { data, isLoading } = useSWR(
+    isAdmin ? ['tickets-admin-stats'] : null, 
+    adminGetTicketStats, 
+    { revalidateOnFocus: false }
+  );
   const overall = data?.overall ?? {};
   return {
     counts: {
@@ -186,13 +194,26 @@ function pickHeaderImage(category: keyof typeof headerArt): string {
 
 /* -------------------- Page -------------------- */
 export default function DashboardPage() {
-  const { data: me, isLoading: loadingUser } = useSWR('/api/users/me', fetcher);
-  const user = me?.user as { firstName?: string } | undefined;
+  const { data: currentUser, isLoading: loadingUser } = useSWR('current-user', getCurrentUser);
+  const user = currentUser as { firstName?: string; role?: string; teams?: Array<{ id: string; isLeader: boolean }> } | undefined;
+  const userRole = user?.role || 'user';
+  const isStaff = userRole === 'staff';
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+  const isTeamLead = !!user?.teams?.some((t) => t.isLeader);
 
   const greeting = useGreeting();
   const quote = useQuote();
-  const { data: overview, isLoading: loadingOverview } = useOverview();
-  const { counts: ticketCounts, isLoading: loadingTickets, raw: rawTicketStats } = useTicketStats();
+  
+  // Admin-specific data
+  const { data: overview, isLoading: loadingOverview } = useOverview(isAdmin);
+  const { counts: ticketCounts, isLoading: loadingTickets, raw: rawTicketStats } = useTicketStats(isAdmin);
+  
+  // Staff-specific data
+  const { data: teamTickets, isLoading: loadingTeamTickets } = useSWR(
+    isStaff ? 'team-tickets' : null,
+    () => getTeamTicketsMinimal({ page: 1, limit: 20 }),
+    { revalidateOnFocus: false }
+  );
   // Stats are already fetched by useTicketStats
 
   // Avoid hydration mismatch: compute on client after mount
@@ -225,12 +246,21 @@ export default function DashboardPage() {
               <p className="opacity-90 text-sm leading-relaxed max-w-prose">{quote}</p>
 
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button size="sm" variant="secondary" asChild>
-                  <Link href="/complaints">View Open Complaints</Link>
-                </Button>
-                <Button size="sm" variant="ghost" className="text-inherit" asChild>
-                  <a href="/agency-contacts">Add Contact</a>
-                </Button>
+                {isAdmin && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link href="/complaints">View Open Complaints</Link>
+                  </Button>
+                )}
+                {isStaff && (
+                  <Button size="sm" variant="secondary" asChild>
+                    <Link href="/my-tickets">View My Tickets</Link>
+                  </Button>
+                )}
+                {isAdmin && (
+                  <Button size="sm" variant="ghost" className="text-inherit" asChild>
+                    <Link href="/agency-contacts">Agency Contacts</Link>
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -248,11 +278,15 @@ export default function DashboardPage() {
         </AnimatedGradientHeader>
       </Card>
 
-      {/* Complaints snapshot - moved to top-right */}
+      {/* Role-based snapshot */}
       <Card className="h-full">
-        <CardHeader className="pb-2"><CardTitle>Complaints snapshot</CardTitle></CardHeader>
+        <CardHeader className="pb-2">
+          <CardTitle>
+            {isAdmin ? 'Complaints snapshot' : 'My Tickets'}
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3 flex-1">
-          {loadingTickets ? (
+          {isAdmin && (loadingTickets ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between">
@@ -271,26 +305,103 @@ export default function DashboardPage() {
               <RowStat label="Closed" value={ticketCounts.closed} badgeVariant="outline" />
               <div className="pt-1 text-xs text-muted-foreground">High priority: {rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0}</div>
             </>
-          )}
+          ))}
+          
+          {isStaff && (loadingTeamTickets ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-5 w-10 rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              {teamTickets?.tickets ? (
+                <>
+                  <RowStat label="Total Assigned" value={teamTickets.tickets.length} badgeVariant="secondary" />
+                  <RowStat 
+                    label="Open" 
+                    value={teamTickets.tickets.filter(t => t.status === 'open').length} 
+                    badgeVariant="default" 
+                  />
+                  <RowStat 
+                    label="In Progress" 
+                    value={teamTickets.tickets.filter(t => t.status === 'in_progress').length} 
+                    badgeVariant="secondary" 
+                  />
+                  <RowStat 
+                    label="Completed" 
+                    value={teamTickets.tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length} 
+                    badgeVariant="outline" 
+                  />
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <span className="text-sm text-muted-foreground">No tickets assigned</span>
+                </div>
+              )}
+            </>
+          ))}
         </CardContent>
       </Card>
 
-      {/* KPI STRIP */}
-      <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
-        <StatsTile label="Total users" value={overview?.totalUsers} loading={loadingOverview} />
-        <StatsTile label="New this week" value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
-        <StatsTile label="Open complaints" value={ticketCounts.open} loading={loadingTickets} />
-        <StatsTile label="High priority" value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
-      </div>
+      {/* Role-based KPI STRIP */}
+      {isAdmin && (
+        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
+          <StatsTile label="Total users" value={overview?.totalUsers} loading={loadingOverview} />
+          <StatsTile label="New this week" value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
+          <StatsTile label="Open complaints" value={ticketCounts.open} loading={loadingTickets} />
+          <StatsTile label="High priority" value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
+        </div>
+      )}
+      
+      {isStaff && teamTickets && (
+        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
+          <StatsTile 
+            label="My Tickets" 
+            value={teamTickets.tickets.length} 
+            loading={loadingTeamTickets} 
+          />
+          <StatsTile 
+            label="Open" 
+            value={teamTickets.tickets.filter(t => t.status === 'open').length} 
+            loading={loadingTeamTickets} 
+            tone="alt" 
+          />
+          <StatsTile 
+            label="In Progress" 
+            value={teamTickets.tickets.filter(t => t.status === 'in_progress').length} 
+            loading={loadingTeamTickets} 
+          />
+          <StatsTile 
+            label="Completed" 
+            value={teamTickets.tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length} 
+            loading={loadingTeamTickets} 
+            tone="alt" 
+          />
+        </div>
+      )}
 
       {/* trends removed */}
 
-      {/* Quick links */}
+      {/* Role-based Quick links */}
       <div className="xl:col-span-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <GradientMini title="Check complaints" href="/complaints" />
-        <GradientMini title="Browse contacts" href="/agency-contacts" variant="alt" />
-        <GradientMini title="Upload circular" disabled />
-        <GradientMini title="View reports" variant="alt" disabled />
+        {isAdmin && (
+          <>
+            <GradientMini title="Check complaints" href="/complaints" />
+            <GradientMini title="Manage teams" href="/teams" variant="alt" />
+            <GradientMini title="Browse contacts" href="/agency-contacts" variant="alt" />
+            <GradientMini title="View reports" variant="alt" disabled />
+          </>
+        )}
+        {isStaff && (
+          <>
+            <GradientMini title="My tickets" href="/my-tickets" />
+            {isTeamLead && <GradientMini title="Team members" href="/team-members" variant="alt" />}
+          </>
+        )}
       </div>
 
       {/* Styles */}

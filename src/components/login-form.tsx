@@ -30,8 +30,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     setLoading(true);
     try {
       const res = await login({ email, password });
+      // For now, keep the token approach until backend supports httpOnly cookies
       setAuthToken(res.token);
-      toast.success("Logged in");
+      toast.success("Login successful");
       const next = search.get("next") ?? "/dashboard";
       router.replace(next);
     } catch (err: unknown) {

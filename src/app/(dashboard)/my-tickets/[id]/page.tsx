@@ -1,0 +1,825 @@
+"use client";
+
+import useSWR from "swr";
+import Link from "next/link";
+import { useState, use } from "react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft,
+  MapPin,
+  Clock,
+  User as UserIcon,
+  FileText,
+  CheckCircle,
+  Calendar,
+  AlertCircle,
+  Flag,
+  Hash,
+  Tag,
+  Users,
+  CalendarClock,
+  Activity,
+  FileText as FileTextIcon,
+  MessageSquare,
+  Plus,
+  Send,
+  ExternalLink
+} from "lucide-react";
+import { api, updateTicketStatusTeam, getTicketAttachments, getTeamTicketById, adminGetTicketHistory, adminAddNote } from "@/lib/api";
+import { formatDateTimeSmart } from "@/lib/utils";
+import { Ticket, User } from "@/lib/types";
+
+// Fetcher function for SWR
+const fetcher = (url: string) => api.get(url).then(res => res.data);
+
+// Helper function to format changed by information
+const formatChangedBy = (changedBy: string | User | undefined) => {
+  if (!changedBy) return 'Unknown User';
+
+  if (typeof changedBy === 'string') return changedBy;
+
+  // Handle User type
+  if (changedBy.fullName) return changedBy.fullName;
+  if (changedBy.firstName && changedBy.lastName) {
+    return `${changedBy.firstName} ${changedBy.lastName}`;
+  }
+  if (changedBy.email) return changedBy.email;
+
+  return 'Unknown User';
+};
+
+// Status badge helper function
+const getStatusBadge = (status: string | undefined) => {
+  if (!status) {
+    return (
+      <Badge variant="secondary" className="bg-gray-500/15 text-gray-700 dark:text-gray-300">
+        LOADING
+      </Badge>
+    );
+  }
+
+  const statusConfig = {
+    open: { variant: "secondary" as const, className: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
+    in_progress: { variant: "default" as const, className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+    pending_user: { variant: "secondary" as const, className: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
+    pending_admin: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
+    resolved: { variant: "secondary" as const, className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+    closed: { variant: "outline" as const, className: "bg-neutral-500/15 text-neutral-700 dark:text-neutral-300" }
+  };
+  
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.open;
+
+  return (
+    <Badge variant={config.variant} className={config.className}>
+      {status.replace("_", " ").toUpperCase()}
+    </Badge>
+  );
+};
+
+interface StaffTicketDetailPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageProps) {
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [resolutionNote, setResolutionNote] = useState("");
+  const [activeSubTab, setActiveSubTab] = useState("activity");
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+  
+  // Unwrap the params promise
+  const { id } = use(params);
+  
+  const { data, isLoading, error, mutate } = useSWR(
+    `team-ticket-${id}`,
+    () => getTeamTicketById(id),
+    { revalidateOnFocus: false }
+  );
+
+  const { data: attachmentsData, isLoading: loadingAttachments } = useSWR(
+    `attachments-${id}`,
+    () => getTicketAttachments(id),
+    { revalidateOnFocus: false }
+  );
+
+  // Ticket History
+  type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: string; changedAt?: string };
+  type TicketHistory = { ticketNumber?: string; title?: string; changeHistory?: ChangeItem[] };
+  const { data: historyResp, isLoading: loadingHistory } = useSWR<TicketHistory>(
+    activeSubTab === "activity" ? `ticket-history-${id}` : null,
+    () => adminGetTicketHistory(id),
+    { revalidateOnFocus: false }
+  );
+
+  const activityItems: ChangeItem[] = (historyResp?.changeHistory ?? [])
+    .filter((h) => !(h.field === 'status' && (h.oldValue ?? '') === (h.newValue ?? '')))
+    .slice()
+    .sort((a, b) => {
+      const ta = a.changedAt ? new Date(a.changedAt).getTime() : 0;
+      const tb = b.changedAt ? new Date(b.changedAt).getTime() : 0;
+      return tb - ta; // newest first
+    });
+
+  const ticket = data?.ticket as Ticket | undefined;
+  const attachments = attachmentsData?.attachments || [];
+  const isClosed = !!ticket && ticket.status === 'closed';
+
+
+  const handleStatusUpdate = async () => {
+    if (!newStatus || !ticket) return;
+
+    try {
+      setUpdatingStatus(true);
+      await updateTicketStatusTeam(id, {
+        status: newStatus as "in_progress" | "pending_user" | "pending_admin" | "resolved"
+      });
+      toast.success("Ticket status updated successfully");
+      mutate(); // Refresh the ticket data
+      setNewStatus("");
+      setResolutionNote("");
+    } catch (error: unknown) {
+      console.error("Failed to update ticket status:", error);
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update ticket status"
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !ticket) return;
+    
+    try {
+      setAddingNote(true);
+      await adminAddNote(id, newNote.trim());
+      toast.success("Note added successfully");
+      mutate(); // Refresh the ticket data to get updated notes
+      setNewNote("");
+    } catch (error: unknown) {
+      console.error("Failed to add note:", error);
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to add note"
+      );
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  const openInGoogleMaps = () => {
+    if (!ticket?.coordinates) return;
+    const url = `https://www.google.com/maps?q=${ticket.coordinates.latitude},${ticket.coordinates.longitude}`;
+    window.open(url, '_blank');
+  };
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/my-tickets">
+              <ArrowLeft className="size-4 mr-2" />
+              Back to My Tickets
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="size-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Ticket Not Found</h2>
+            <p className="text-muted-foreground text-center">
+              This ticket doesn&apos;t exist or you don&apos;t have permission to view it.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/my-tickets">
+              <ArrowLeft className="size-4 mr-2" />
+              Back to My Tickets
+            </Link>
+          </Button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-4 w-32" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!ticket) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+     
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/my-tickets">
+              <ArrowLeft className="size-4 mr-2" />
+              Back to My Tickets
+            </Link>
+          </Button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* Status actions moved to dedicated section */}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Left Column - Main Details */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Ticket Header */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div className="space-y-3">
+                  <div>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <Hash className="size-5 text-muted-foreground" />
+                      Ticket #{ticket._id?.slice(-8) || id.slice(-8)}
+                    </CardTitle>
+                    {ticket.ticketNumber && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Reference: {ticket.ticketNumber}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center flex-wrap gap-2">
+                    {getStatusBadge(ticket?.status)}
+                    {ticket.priority && (
+                      <Badge 
+                        variant="outline" 
+                        className={`
+                          ${ticket.priority === 'urgent' ? 'border-red-500 text-red-700 dark:text-red-300' : ''}
+                          ${ticket.priority === 'high' ? 'border-orange-500 text-orange-700 dark:text-orange-300' : ''}
+                          ${ticket.priority === 'medium' ? 'border-yellow-500 text-yellow-700 dark:text-yellow-300' : ''}
+                          ${ticket.priority === 'low' ? 'border-green-500 text-green-700 dark:text-green-300' : ''}
+                        `}
+                      >
+                        <Flag className="size-3 mr-1" />
+                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)} Priority
+                      </Badge>
+                    )}
+                    {ticket.category && (
+                      <Badge variant="secondary">
+                        <Tag className="size-3 mr-1" />
+                        {typeof ticket.category === 'string'
+                          ? ticket.category.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+                          : typeof ticket.category === 'object' && ticket.category && 'name' in ticket.category
+                          ? (ticket.category as { name: string }).name.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+                          : 'Category'}
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <CalendarClock className="size-4" />
+                      <span>Created {ticket?.createdAt ? formatDateTimeSmart(ticket.createdAt) : 'Loading...'}</span>
+                    </div>
+                    {ticket?.updatedAt && ticket.updatedAt !== ticket.createdAt && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="size-4" />
+                        <span>Updated {formatDateTimeSmart(ticket.updatedAt)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {ticket.title && (
+                  <div>
+                    <h3 className="font-medium mb-2">Title</h3>
+                    <p className="text-sm">{ticket.title}</p>
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-medium mb-2">Description</h3>
+                  <p className="text-sm leading-relaxed">{ticket.description}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notes & Activity */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Notes & Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full">
+                <TabsList>
+                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                  <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="activity" className="mt-4">
+                  {loadingHistory ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="relative pl-10">
+                          <Skeleton className="h-3 w-3 rounded-full absolute left-2.5 top-1" />
+                          <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                            <Skeleton className="h-4 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : activityItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="rounded-full bg-muted p-3 w-fit mx-auto mb-3">
+                        <Flag className="size-6 text-muted-foreground" />
+                      </div>
+                      <div className="text-sm text-muted-foreground">No activity yet</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Changes and updates will appear here
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <div className="absolute left-4 top-0 bottom-0 w-px bg-border" aria-hidden />
+                      <div className="space-y-4">
+                        {activityItems.map((h, index) => (
+                          <div key={h.id || index} className="relative pl-10">
+                            <div className={`absolute left-2.5 top-1 h-3 w-3 rounded-full border-2 border-background ${
+                              h.field === 'status' ? 'bg-blue-500' : 'bg-muted-foreground'
+                            }`} />
+                            
+                            <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {h.changeType?.replace(/_/g, " ") ?? "Change"}
+                                  </Badge>
+                                  {h.field && (
+                                    <span className="text-xs text-muted-foreground">
+                                      • {h.field}
+                                    </span>
+                                  )}
+                                </div>
+                                {h.changedAt && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDateTimeSmart(h.changedAt)}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="text-sm">
+                                {h.field === 'status' ? (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span>Status changed from</span>
+                                    <Badge variant="outline" className="capitalize">
+                                      {(h.oldValue ?? '').toString().replace(/_/g, ' ')}
+                                    </Badge>
+                                    <span>to</span>
+                                    <Badge variant="outline" className="capitalize">
+                                      {(h.newValue ?? '').toString().replace(/_/g, ' ')}
+                                    </Badge>
+                                  </div>
+                                ) : (
+                                  <div>{h.description ?? `${h.field ?? 'Field'} updated`}</div>
+                                )}
+                              </div>
+                              
+                              {h.changedBy && (
+                                <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
+                                  Changed by: {formatChangedBy(h.changedBy)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="notes" className="mt-4">
+                  {/* Add Note Form */}
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-start gap-3">
+                      <Textarea
+                        placeholder="Add a note about this ticket..."
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        rows={3}
+                        className="flex-1"
+                        maxLength={1000}
+                      />
+                      <Button 
+                        onClick={handleAddNote}
+                        disabled={!newNote.trim() || addingNote}
+                        size="sm"
+                        className="shrink-0"
+                      >
+                        {addingNote ? (
+                          <>
+                            <Clock className="h-4 w-4 mr-1 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-1" />
+                            Add Note
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    {newNote.length > 0 && (
+                      <div className="text-xs text-muted-foreground text-right">
+                        {newNote.length}/1000 characters
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Existing Notes */}
+                  {(ticket?.adminNotes && ticket.adminNotes.length > 0) ? (
+                    <div className="grid gap-2">
+                      {ticket.adminNotes
+                        .slice()
+                        .sort((a, b) => {
+                          const ta = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+                          const tb = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+                          return tb - ta; // newest first
+                        })
+                        .map((note, index) => (
+                          <div key={note._id || index} className="text-xs text-muted-foreground border rounded p-2">
+                            <div className="text-foreground text-sm">{note.note}</div>
+                            {note.addedAt && (
+                              <div className="opacity-70 mt-1">
+                                {formatDateTimeSmart(note.addedAt)}
+                                {note.addedBy && (
+                                  <span> • by {formatChangedBy(note.addedBy)}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No notes yet</div>
+                  )}
+                </TabsContent>
+                
+                <TabsContent value="attachments" className="mt-4">
+                  {loadingAttachments ? (
+                    <div className="grid gap-2">
+                      <Skeleton className="h-16 w-full" />
+                      <Skeleton className="h-16 w-3/4" />
+                    </div>
+                  ) : attachments.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">No attachments</div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {attachments.map((att) => (
+                        <div key={att._id} className="rounded-lg border p-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="p-2 rounded-md bg-muted/50">
+                              <FileText className="size-4 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm truncate">{att.filename}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {att.mimeType} • {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                              </div>
+                            </div>
+                          </div>
+                          <Button asChild size="sm" variant="outline" className="ml-3">
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+                              <ExternalLink className="size-3" />
+                              Open
+                            </a>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Location */}
+          {(ticket.coordinates || ticket.location) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="size-5 text-blue-600" />
+                  Incident Location
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Address Information */}
+                  {ticket.location && (
+                    <div className="p-3 bg-muted/30 rounded-lg border">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground">
+                            📍 Reported Location
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {[
+                              ticket.location.area && `${ticket.location.area}`,
+                              ticket.location.zone && `${ticket.location.zone}`,
+                              ticket.location.city,
+                              ticket.location.state
+                            ].filter(Boolean).join(", ")}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Map Action */}
+                  {ticket.coordinates && (
+                    <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                          <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                            Precise Location Available
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            GPS coordinates captured from the report
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openInGoogleMaps}
+                        className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+                      >
+                        <ExternalLink className="size-4 mr-2" />
+                        View on Map
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* No location fallback */}
+                  {!ticket.location && !ticket.coordinates && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <MapPin className="size-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No location information available</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+        </div>
+
+        {/* Right Column - Metadata */}
+        <div className="space-y-6">
+          {/* Status Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Flag className="size-4 text-blue-600" />
+                Status & Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Current Status */}
+              <div className="p-3 bg-muted/30 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Current Status</span>
+                  {getStatusBadge(ticket.status)}
+                </div>
+                {/* Removed created/updated timestamp from this card as requested */}
+              </div>
+              
+              {/* Status Update Form */}
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Update Status:</label>
+                  <Select value={newStatus} onValueChange={setNewStatus} disabled={isClosed}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Change status..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full bg-sky-500"></div>
+                          Open
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="in_progress">
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full bg-amber-500"></div>
+                          In Progress
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="resolved">
+                        <div className="flex items-center gap-2">
+                          <div className="size-2 rounded-full bg-emerald-500"></div>
+                          Resolved
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="closed" disabled>
+                        <div className="flex items-center gap-2 opacity-60">
+                          <div className="size-2 rounded-full bg-neutral-500"></div>
+                          Closed
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {newStatus === "resolved" && (
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Resolution Note:</label>
+                    <Textarea
+                      placeholder="How was this resolved?"
+                      value={resolutionNote}
+                      onChange={(e) => setResolutionNote(e.target.value)}
+                      rows={2}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+                
+                <Button 
+                  onClick={handleStatusUpdate}
+                  disabled={!newStatus || updatingStatus || newStatus === ticket?.status || isClosed}
+                  className="w-full h-9"
+                  size="sm"
+                >
+                  {updatingStatus ? (
+                    <>
+                      <Clock className="size-3 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="size-3 mr-2" />
+                      Update Status
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              <Separator />
+              
+              {/* Timing Info (created removed as requested) */}
+              <div className="space-y-2 text-xs text-muted-foreground">
+                {ticket?.updatedAt && ticket.updatedAt !== ticket.createdAt && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="size-3" />
+                    <span>Updated {formatDateTimeSmart(ticket.updatedAt)}</span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Assigned Teams */}
+          {ticket.assignedTeams && ticket.assignedTeams.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="size-4" />
+                  Assigned Teams
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {ticket.assignedTeams.map((team) => (
+                    <div key={team._id} className="p-3 bg-muted/30 rounded-lg border">
+                      <div className="font-medium text-sm flex items-center gap-2">
+                        <Users className="size-3 text-muted-foreground" />
+                        {team.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {team.areas && team.areas.length > 0
+                          ? team.areas.reduce((acc, area, idx) =>
+                              acc + (idx > 0 ? "; " : "") + `${area.zone}, ${area.city}`, "")
+                          : "No areas assigned"}
+                      </div>
+                      {team.isActive && (
+                        <Badge variant="secondary" className="mt-2 text-xs">
+                          Active Team
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reporter Info */}
+          {ticket.reportedBy && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <UserIcon className="size-4" />
+                  Reported By
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="font-medium">{ticket.reportedBy.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{ticket.reportedBy.email}</p>
+                  {ticket.reportedBy.phoneNumber && (
+                    <p className="text-sm text-muted-foreground">{ticket.reportedBy.phoneNumber}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+         
+          {(ticket.tags && ticket.tags.length > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Tag className="size-4" />
+                  Tags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {ticket.tags.map((tag, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Escalation Status */}
+          {(ticket.escalated || ticket.slaBreached) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertCircle className="size-4" />
+                  Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {ticket.escalated && (
+                  <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950/20 rounded-md">
+                    <AlertCircle className="size-4 text-orange-600" />
+                    <span className="text-sm text-orange-700 dark:text-orange-300">
+                      Ticket has been escalated
+                    </span>
+                  </div>
+                )}
+                {ticket.slaBreached && (
+                  <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/20 rounded-md">
+                    <Clock className="size-4 text-red-600" />
+                    <span className="text-sm text-red-700 dark:text-red-300">
+                      SLA deadline breached
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

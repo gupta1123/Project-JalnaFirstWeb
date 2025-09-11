@@ -21,6 +21,19 @@ export function UserMenu() {
   const name = data?.fullName ?? (data ? `${data.firstName} ${data.lastName}` : "Admin");
   const email = data?.email ?? "admin@example.com";
 
+  // Determine display role. Admin/superadmin => Admin; if user has any team with isLeader => Team Lead; else Staff/User
+  const isTeamLead = Boolean(
+    data?.teams && Array.isArray(data.teams) && data.teams.some((t) => t?.isLeader === true)
+  );
+
+  const roleLabel = (() => {
+    const role = data?.role;
+    if (role === "admin" || role === "superadmin") return "Admin";
+    if (isTeamLead) return "Team Lead";
+    if (role === "staff") return "Staff";
+    return role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
+  })();
+
   async function handleLogout() {
     try {
       await fetch("/logout", { method: "POST" });
@@ -40,7 +53,7 @@ export function UserMenu() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{name}</span>
-                <span className="truncate text-xs opacity-70">{email}</span>
+                <span className="truncate text-xs opacity-70">{roleLabel}</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -54,7 +67,7 @@ export function UserMenu() {
             </div>
             <div className="min-w-0">
               <div className="truncate font-medium">{name}</div>
-              <div className="truncate text-xs text-muted-foreground">{email}</div>
+              <div className="truncate text-xs text-muted-foreground">{roleLabel}</div>
             </div>
           </div>
         </DropdownMenuLabel>

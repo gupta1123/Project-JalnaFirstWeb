@@ -60,6 +60,11 @@ function getTopbarHeading(path: string) {
   if (path.startsWith("/users")) return { title: "Users", subtitle: "Search, filter and manage" };
   if (path.startsWith("/complaints/")) return { title: "Complaint", subtitle: "Timeline and actions" };
   if (path.startsWith("/complaints")) return { title: "Complaints", subtitle: "Track and resolve citizen issues" };
+  if (path.startsWith("/teams")) return { title: "Teams", subtitle: "Manage staff teams and assignments" };
+  if (path.startsWith("/team-members")) return { title: "Team Members", subtitle: "Manage your team" };
+  if (path.startsWith("/my-tickets")) return { title: "My Assigned Tickets", subtitle: "View and manage tickets assigned to your team" };
+  if (path.startsWith("/staff")) return { title: "Staff", subtitle: "Manage staff members" };
+  if (path.startsWith("/categories")) return { title: "Categories", subtitle: "Manage categories and subcategories" };
   return { title: "Admin", subtitle: "" };
 }
 
