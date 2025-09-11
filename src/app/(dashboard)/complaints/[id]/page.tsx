@@ -72,8 +72,10 @@ const formatChangedBy = (changedBy: string | User | ChangedBy) => {
 
 // Helper function to open location in Google Maps
 const openInGoogleMaps = (ticket: Ticket) => {
-  if (!ticket.coordinates) return;
-  const url = `https://www.google.com/maps?q=${ticket.coordinates.latitude},${ticket.coordinates.longitude}`;
+  const coordinates = ticket.location?.coordinates || ticket.coordinates;
+  if (!coordinates) return;
+  const { latitude, longitude } = coordinates;
+  const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
   window.open(url, '_blank');
 };
 
@@ -360,72 +362,55 @@ export default function ComplaintDetailPage() {
               )}
             </div>
 
-            {/* Location Section */}
-            {(ticket?.coordinates || ticket?.location) && (
-              <div className="rounded-lg border p-4 grid gap-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <MapPin className="size-4 text-blue-600" />
-                  Incident Location
-                </div>
-                <div className="space-y-4">
-                  {/* Address Information */}
-                  {ticket.location && (
-                    <div className="p-3 bg-muted/30 rounded-lg border">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
-                            📍 Reported Location
-                          </p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {[
-                              ticket.location.area && `${ticket.location.area}`,
-                              ticket.location.zone && `${ticket.location.zone}`,
-                              ticket.location.city,
-                              ticket.location.state
-                            ].filter(Boolean).join(", ")}
-                          </p>
+            {/* Location */}
+            {(ticket?.location?.coordinates || ticket?.coordinates || ticket?.location) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="size-5 text-blue-600" />
+                    Incident Location
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Map Action */}
+                    {(ticket.location?.coordinates || ticket.coordinates) && (
+                      <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                            <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                              Precise Location Available
+                            </p>
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              GPS coordinates captured from the report
+                            </p>
+                          </div>
                         </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openInGoogleMaps(ticket)}
+                          className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
+                        >
+                          <ExternalLink className="size-4 mr-2" />
+                          View on Map
+                        </Button>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Map Action */}
-                  {ticket.coordinates && (
-                    <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
-                          <MapPin className="size-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            Precise Location Available
-                          </p>
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            GPS coordinates captured from the report
-                          </p>
-                        </div>
+                    {/* No location fallback */}
+                    {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <MapPin className="size-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No location information available</p>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openInGoogleMaps(ticket)}
-                        className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
-                      >
-                        <ExternalLink className="size-4 mr-2" />
-                        View on Map
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* No location fallback */}
-                  {!ticket.location && !ticket.coordinates && (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <MapPin className="size-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No location information available</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Two-column layout: left Tabs (Notes/Activity), right Details */}

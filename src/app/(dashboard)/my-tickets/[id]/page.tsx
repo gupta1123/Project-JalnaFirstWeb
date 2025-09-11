@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowLeft,
   MapPin,
@@ -27,7 +28,11 @@ import {
   Users,
   CalendarClock,
   Send,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  Image,
+  Video,
+  File
 } from "lucide-react";
 import { api, updateTicketStatusTeam, getTicketAttachments, getTeamTicketById, adminGetTicketHistory, adminAddNote } from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
@@ -126,6 +131,18 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+  } | null>(null);
+  const isImage = (m?: string) => Boolean(m && m.startsWith("image/"));
+  const isVideo = (m?: string) => Boolean(m && m.startsWith("video/"));
+  const isPdf = (m?: string) => m === "application/pdf";
+  
   // Unwrap the params promise
   const { id } = use(params);
   
@@ -206,8 +223,10 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   };
 
   const openInGoogleMaps = () => {
-    if (!ticket?.coordinates) return;
-    const url = `https://www.google.com/maps?q=${ticket.coordinates.latitude},${ticket.coordinates.longitude}`;
+    const coordinates = ticket?.location?.coordinates || ticket?.coordinates;
+    if (!coordinates) return;
+    const { latitude, longitude } = coordinates;
+    const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     window.open(url, '_blank');
   };
 
@@ -535,26 +554,57 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   ) : attachments.length === 0 ? (
                     <div className="text-xs text-muted-foreground">No attachments</div>
                   ) : (
-                    <div className="grid gap-3">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {attachments.map((att) => (
-                        <div key={att._id} className="rounded-lg border p-3 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="p-2 rounded-md bg-muted/50">
-                              <FileText className="size-4 text-muted-foreground" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-sm truncate">{att.filename}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {att.mimeType} • {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                        <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
+                          {/* Thumbnail/Icon */}
+                          <div className="w-full h-full flex items-center justify-center">
+                            {isImage(att.mimeType) ? (
+                              <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                            ) : isVideo(att.mimeType) ? (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Video className="size-12" />
+                                <span className="text-xs font-medium">VIDEO</span>
                               </div>
-                            </div>
+                            ) : isPdf(att.mimeType) ? (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <FileText className="size-12" />
+                                <span className="text-xs font-medium">PDF</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <File className="size-12" />
+                                <span className="text-xs font-medium">FILE</span>
+                              </div>
+                            )}
                           </div>
-                          <Button asChild size="sm" variant="outline" className="ml-3">
-                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
-                              <ExternalLink className="size-3" />
-                              Open
-                            </a>
-                          </Button>
+                          
+                          {/* Overlay Actions */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              className="bg-white/90 hover:bg-white text-black border-0"
+                              onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                            <Button 
+                              asChild 
+                              size="sm" 
+                              variant="secondary"
+                              className="bg-white/90 hover:bg-white text-black border-0"
+                            >
+                              <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="size-4" />
+                              </a>
+                            </Button>
+                          </div>
+                          
+                          {/* File size indicator */}
+                          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                            {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -565,7 +615,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           </Card>
 
           {/* Location */}
-          {(ticket.coordinates || ticket.location) && (
+          {(ticket.location?.coordinates || ticket.coordinates || ticket.location) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -575,29 +625,8 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Address Information */}
-                  {ticket.location && (
-                    <div className="p-3 bg-muted/30 rounded-lg border">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-foreground">
-                            📍 Reported Location
-                          </p>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {[
-                              ticket.location.area && `${ticket.location.area}`,
-                              ticket.location.zone && `${ticket.location.zone}`,
-                              ticket.location.city,
-                              ticket.location.state
-                            ].filter(Boolean).join(", ")}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
                   {/* Map Action */}
-                  {ticket.coordinates && (
+                  {(ticket.location?.coordinates || ticket.coordinates) && (
                     <div className="flex items-center justify-between p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -625,7 +654,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   )}
                   
                   {/* No location fallback */}
-                  {!ticket.location && !ticket.coordinates && (
+                  {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
                     <div className="text-center py-6 text-muted-foreground">
                       <MapPin className="size-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">No location information available</p>
@@ -850,6 +879,53 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           )}
         </div>
       </div>
+      
+      {/* Attachment Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={(o) => { setPreviewOpen(o); if (!o) setPreviewAttachment(null); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewAttachment && isImage(previewAttachment.mimeType) && <Image className="size-5" />}
+              {previewAttachment && isVideo(previewAttachment.mimeType) && <Video className="size-5" />}
+              {previewAttachment && isPdf(previewAttachment.mimeType) && <FileText className="size-5" />}
+              {previewAttachment && !isImage(previewAttachment.mimeType) && !isVideo(previewAttachment.mimeType) && !isPdf(previewAttachment.mimeType) && <File className="size-5" />}
+              Preview
+            </DialogTitle>
+            {previewAttachment && (
+              <DialogDescription className="flex items-center justify-between">
+                <span>{previewAttachment.mimeType}</span>
+                <Button asChild size="sm" variant="outline">
+                  <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+                    <ExternalLink className="size-3" />
+                    Open Original
+                  </a>
+                </Button>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="mt-4 flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden" style={{ minHeight: '60vh' }}>
+            {previewAttachment ? (
+              isImage(previewAttachment.mimeType) ? (
+                <img src={previewAttachment.url} alt="Attachment" className="max-h-[60vh] max-w-full object-contain rounded" />
+              ) : isVideo(previewAttachment.mimeType) ? (
+                <video src={previewAttachment.url} controls className="max-h-[60vh] max-w-full rounded" />
+              ) : isPdf(previewAttachment.mimeType) ? (
+                <iframe src={previewAttachment.url} className="w-full h-[60vh] rounded border-0" />
+              ) : (
+                <div className="text-center py-12">
+                  <File className="size-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Preview not available for this file type
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use &quot;Open Original&quot; to view the file
+                  </p>
+                </div>
+              )
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
