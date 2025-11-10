@@ -1,7 +1,7 @@
 Social Service
 
 https://social-service-backend-01d8c088884a.herokuapp.com/
-https://jalnafirst-03821e1b4515.herokuapp.com/
+https://jalnafirst-d1c348495722.herokuapp.com/
 
 
 User
@@ -1321,7 +1321,7 @@ REsponse:
 
 Update Ticket Status (Admin)
 Put Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/admin/689b9c15b51a631d7791f6fe
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/admin/689b9c15b51a631d7791f6fe
 Payload:
 {
   "status": "resolved",                             // Optional
@@ -1570,7 +1570,7 @@ Response:
 Change History (Admin Or Creator)
 Get Call
 https://social-service-backend-01d8c088884a.herokuapp.com/api/tickets/admin/689cc010027cf3d9de3e9cdf/history
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/68bea7f17c9ff4dea93ff781/history
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/68bea7f17c9ff4dea93ff781/history
 Response:
 {
     "ticketNumber": "TKT-202509-0001",
@@ -1593,7 +1593,7 @@ Response:
 
 Assign team to the ticket(Admin)
 Post Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/admin/68bea7f17c9ff4dea93ff781/assign-teams
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/admin/68bea7f17c9ff4dea93ff781/assign-teams
 Payload:
 {
   "teamIds": ["68be6bc76038d70a4c3d071f"],
@@ -1671,7 +1671,7 @@ Response:
 
 Mark complete the ticket (For end user)
 Post Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/689c9d0a027cf3d9de3e992f/complete
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/689c9d0a027cf3d9de3e992f/complete
 Response:
 {
     "message": "Ticket marked as completed",
@@ -1740,7 +1740,7 @@ Response:
 
 Get attachments
 Get Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/68bea7f17c9ff4dea93ff781/attachments
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/68bea7f17c9ff4dea93ff781/attachments
 Response:
 {
     "attachments": [
@@ -1771,7 +1771,7 @@ Response:
 Staff & Teams
 Create Staff
 Post call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/staff
+https://jalnafirst-d1c348495722.herokuapp.com/api/staff
 Payload:
 {
     "firstName":"Staff",
@@ -1817,8 +1817,8 @@ Response:
 
 Get Staffs
 Get Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/staff
-https://jalnafirst-03821e1b4515.herokuapp.com/api/staff?page=1&limit=10&search=staff
+https://jalnafirst-d1c348495722.herokuapp.com/api/staff
+https://jalnafirst-d1c348495722.herokuapp.com/api/staff?page=1&limit=10&search=staff
 Response:
 {
     "staff": [
@@ -1859,15 +1859,15 @@ Response:
 
 Edit staff
 Put Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/staff/68be652bb9662cbed3e3a121
+https://jalnafirst-d1c348495722.herokuapp.com/api/staff/68be652bb9662cbed3e3a121
 
 Get By Id
 Get Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/staff/68be652bb9662cbed3e3a121
+https://jalnafirst-d1c348495722.herokuapp.com/api/staff/68be652bb9662cbed3e3a121
 
 Create Team
 Post Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/teams
+https://jalnafirst-d1c348495722.herokuapp.com/api/teams
 Payload:
 {
   "name": "Zone A Team Maharashtra",
@@ -1903,7 +1903,7 @@ Response:
 
 Add Staff to the team
 Post Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/employees
+https://jalnafirst-d1c348495722.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/employees
 Payload:
 {
     "employees": ["68be652bb9662cbed3e3a121"]
@@ -1946,12 +1946,12 @@ Response:
 
 Remove staff from Team
 Delete Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/employees/68be652bb9662cbed3e3a121
+https://jalnafirst-d1c348495722.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/employees/68be652bb9662cbed3e3a121
 
 
 Get All the teams
 Get Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/teams?page=1&limit=10&search=zone&zone=Zone%20A&isActive=true
+https://jalnafirst-d1c348495722.herokuapp.com/api/teams?page=1&limit=10&search=zone&zone=Zone%20A&isActive=true
 Response:
 {
     "teams": [
@@ -2074,7 +2074,7 @@ Response:
 
 Add team leader
 Put Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/leader
+https://jalnafirst-d1c348495722.herokuapp.com/api/teams/68be6bc76038d70a4c3d071f/leader
 Payload:
 {
     "leaderId": "68be652bb9662cbed3e3a121"
@@ -2133,7 +2133,7 @@ Response:
 
 Get Tickets with Minimal details(For team)
 Get Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/team/minimal
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/team/minimal
 Response:
 {
     "tickets": [
@@ -2163,7 +2163,7 @@ Response:
 
 Update the ticket status (Team)
 Put Call
-https://jalnafirst-03821e1b4515.herokuapp.com/api/tickets/team/:ticketId/status
+https://jalnafirst-d1c348495722.herokuapp.com/api/tickets/team/:ticketId/status
 Payload
 {
   "status": "in_progress" | "pending_user" | "pending_admin" | "resolved"

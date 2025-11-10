@@ -61,7 +61,7 @@ export default function UsersPage() {
 
   return (
     <>
-      {/* Password Protection Dialog - Only for Users Page */}
+      
       <Dialog open={showPasswordDialog} onOpenChange={() => {}}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

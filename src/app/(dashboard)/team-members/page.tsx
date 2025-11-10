@@ -14,7 +14,7 @@ import {
   getStaff,
   getTeams,
   createStaff,
-  // updateTeamLeader, // removed (no longer changing team lead)
+
 } from "@/lib/api";
 import type { User, Team } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -166,7 +166,7 @@ export default function TeamMembersPage() {
       staff.role === 'staff' && (!staff.teams || staff.teams.length === 0)
     );
     
-    // Debug logging
+
     console.log("Unassigned staff calculation:", {
       allStaff: allStaff.length,
       staffWithRole: allStaff.filter(s => s.role === 'staff').length,
@@ -199,7 +199,7 @@ export default function TeamMembersPage() {
     }
   };
 
-  // Edit member function removed - now handled in separate page
+
 
   const onRemoveMember = async (memberId: string) => {
     if (!team) return;
@@ -217,20 +217,7 @@ export default function TeamMembersPage() {
     }
   };
 
-  // const onPromoteToLead = async (memberId: string) => {
-  //   if (!team) return;
-  //   
-  //   setSubmitting(true);
-  //   try {
-  //     await updateTeamLeader(team._id, memberId);
-  //     toast.success("Team lead updated successfully");
-  //     mutateTeam();
-  //   } catch (error) {
-  //     toast.error("Failed to update team lead");
-  //   } finally {
-  //     setSubmitting(false);
-  //   }
-  // };
+ 
 
   const getInitials = (name?: string) => {
     if (!name) return 'TM';
@@ -260,7 +247,7 @@ export default function TeamMembersPage() {
 
   return (
     <div className="grid gap-6">
-      {/* Header */}
+
       <Card className="overflow-hidden border-0 bg-transparent shadow-none">
         <motion.div 
           initial={{ opacity: 0, y: 8 }} 
@@ -411,7 +398,7 @@ export default function TeamMembersPage() {
           </CardContent>
         </Card>
 
-        {/* Team Info Sidebar */}
+
         <div className="space-y-4">
           <Card>
             <CardHeader>
@@ -451,7 +438,7 @@ export default function TeamMembersPage() {
         </div>
       </div>
 
-      {/* Add Member Dialog */}
+
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -771,4 +758,4 @@ function CreateNewMemberForm({
   );
 }
 
-// Edit Member Form removed - now handled in separate page
+

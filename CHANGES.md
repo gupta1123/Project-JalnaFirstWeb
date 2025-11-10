@@ -5,7 +5,7 @@ An actionable checklist to finalize and harden the Jalna First Admin Panel. Item
 ## ✅ COMPLETED: Critical Updates
 
 ### API & Backend Integration
-- ✅ **Updated API base URL** to match actual backend: `https://jalnafirst-03821e1b4515.herokuapp.com`
+- ✅ **Updated API base URL** to match actual backend: `https://jalnafirst-d1c348495722.herokuapp.com`
 - ✅ **Added all missing endpoints** from api.md: Staff management, Teams, Ticket attachments, User stats
 - ✅ **Updated TypeScript types** to match backend response shapes (User, Ticket, Team types)
 - ✅ **Enhanced error handling** with centralized SWR fetcher and 401 interceptor

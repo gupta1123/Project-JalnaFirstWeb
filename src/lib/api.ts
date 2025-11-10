@@ -4,7 +4,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory } from "./types";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jalnafirst-03821e1b4515.herokuapp.com";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jalnafirst-d1c348495722.herokuapp.com";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
