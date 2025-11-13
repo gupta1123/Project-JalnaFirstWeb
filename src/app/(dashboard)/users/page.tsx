@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Lock, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 export default function UsersPage() {
   const [page, setPage] = useState(1);
@@ -27,8 +28,8 @@ export default function UsersPage() {
 
   const queryKey = useMemo(() => ["users", { page, limit, search }], [page, limit, search]);
   const { data, isLoading } = useSWR(
-    isAuthenticated ? queryKey : null, 
-    () => getUsers({ page, limit, search: search || undefined }), 
+    isAuthenticated ? queryKey : null,
+    () => getUsers({ page, limit, search: search || undefined }),
     { revalidateOnFocus: false }
   );
   const users: User[] = data?.users ?? [];
@@ -47,7 +48,7 @@ export default function UsersPage() {
         setShowPasswordDialog(false);
       }
     } else {
-      alert("Incorrect password. Please try again.");
+      toast.error("Incorrect password. Please try again.");
       setPassword("");
     }
   };
@@ -62,7 +63,15 @@ export default function UsersPage() {
   return (
     <>
       
-      <Dialog open={showPasswordDialog} onOpenChange={() => {}}>
+      <Dialog
+        open={showPasswordDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            window.history.back();
+            setShowPasswordDialog(true);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

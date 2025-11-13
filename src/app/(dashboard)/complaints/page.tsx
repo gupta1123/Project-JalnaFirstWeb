@@ -130,23 +130,15 @@ export default function ComplaintsPage() {
                   <TableCell>
                     {(() => {
                       const cb = t.createdBy as unknown;
-                      let userId: string | undefined;
-                      let userName: string | undefined;
                       if (typeof cb === 'string') {
-                        userId = cb;
-                        userName = 'View';
-                      } else if (cb && typeof cb === 'object') {
-                        const o = cb as Record<string, unknown>;
-                        userId = (o._id as string) ?? (o.id as string);
-                        userName = (o.fullName as string) ?? (o.email as string) ?? 'User';
+                        return <span className="block max-w-[220px] truncate" title={cb}>{cb}</span>;
                       }
-                      return userId ? (
-                        <Link href={`/users/${userId}`} className="underline underline-offset-2">
-                          <span className="block max-w-[220px] truncate" title={userName}>{userName}</span>
-                        </Link>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      );
+                      if (cb && typeof cb === 'object') {
+                        const o = cb as Record<string, unknown>;
+                        const userName = (o.fullName as string) ?? (o.email as string) ?? 'User';
+                        return <span className="block max-w-[220px] truncate" title={userName}>{userName}</span>;
+                      }
+                      return <span className="text-muted-foreground">-</span>;
                     })()}
                   </TableCell>
                   <TableCell className="capitalize">
