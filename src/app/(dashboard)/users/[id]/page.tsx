@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import {
   XCircle,
   CalendarClock,
   UserRound,
+  ArrowLeft,
 } from 'lucide-react';
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
@@ -131,6 +132,7 @@ const mapsLink = (c?: Coordinates, city?: string) => {
 
 /* -------------------- Page -------------------- */
 export default function UserDetailPage() {
+  const router = useRouter();
   const params = useParams<{ id: string }>();
   const userId = params?.id as string;
   const { data, isLoading } = useSWR<UserResponse>(userId ? `/api/users/${userId}` : null, fetcher);
@@ -159,6 +161,14 @@ export default function UserDetailPage() {
         <AnimatedGradientHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-primary-foreground">
             <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.back()} 
+                className="text-primary-foreground hover:bg-foreground/10"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
               <Dialog>
                 <DialogTrigger asChild>
                   <button type="button" aria-label="Open profile photo" className="rounded-full">
@@ -274,16 +284,23 @@ export default function UserDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {userTickets.map((t) => (
-                    <tr key={t._id} className="border-t">
-                      <td className="py-2 pr-4">{t.ticketNumber ?? t._id}</td>
-                      <td className="py-2 pr-4 max-w-[280px] truncate">{t.title}</td>
-                      <td className="py-2 pr-4 capitalize">{t.category}</td>
-                      <td className="py-2 pr-4"><Badge className="capitalize">{t.priority}</Badge></td>
-                      <td className="py-2 pr-4"><Badge variant="outline" className="capitalize">{t.status?.replace(/_/g, ' ')}</Badge></td>
-                      <td className="py-2 pr-0">{fmtDate(t.createdAt)}</td>
-                    </tr>
-                  ))}
+                  {userTickets.map((t) => {
+                    const categoryDisplay = typeof t.category === 'string' 
+                      ? t.category 
+                      : (t.category && typeof t.category === 'object' 
+                        ? (t.category as { name?: string; _id?: string }).name || (t.category as { _id?: string })._id || '—'
+                        : '—');
+                    return (
+                      <tr key={t._id} className="border-t">
+                        <td className="py-2 pr-4">{t.ticketNumber ?? t._id}</td>
+                        <td className="py-2 pr-4 max-w-[280px] truncate">{t.title}</td>
+                        <td className="py-2 pr-4 capitalize">{categoryDisplay}</td>
+                        <td className="py-2 pr-4"><Badge className="capitalize">{t.priority}</Badge></td>
+                        <td className="py-2 pr-4"><Badge variant="outline" className="capitalize">{t.status?.replace(/_/g, ' ')}</Badge></td>
+                        <td className="py-2 pr-0">{fmtDate(t.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
