@@ -14,8 +14,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Moon, Sun, Monitor, LogOut } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export function UserMenu() {
+  const { lang } = useLanguage();
   const { data } = useSWR("me", getCurrentUser);
   const { setTheme } = useTheme();
   const name = data?.fullName ?? (data ? `${data.firstName} ${data.lastName}` : "Admin");
@@ -26,13 +29,14 @@ export function UserMenu() {
     data?.teams && Array.isArray(data.teams) && data.teams.some((t) => t?.isLeader === true)
   );
 
-  const roleLabel = (() => {
+  const roleKey = (() => {
     const role = data?.role;
-    if (role === "admin" || role === "superadmin") return "Admin";
-    if (isTeamLead) return "Team Lead";
-    if (role === "staff") return "Staff";
-    return role ? role.charAt(0).toUpperCase() + role.slice(1) : "User";
+    if (role === "admin" || role === "superadmin") return "sidebar.userMenu.role.admin";
+    if (isTeamLead) return "sidebar.userMenu.role.teamLead";
+    if (role === "staff") return "sidebar.userMenu.role.staff";
+    return "sidebar.userMenu.role.user";
   })();
+  const roleLabel = tr(lang, roleKey);
 
   async function handleLogout() {
     try {
@@ -73,17 +77,17 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setTheme("light")}>
-          <Sun className="mr-2 size-4" /> Light
+          <Sun className="mr-2 size-4" /> {tr(lang, "sidebar.userMenu.light")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("dark")}>
-          <Moon className="mr-2 size-4" /> Dark
+          <Moon className="mr-2 size-4" /> {tr(lang, "sidebar.userMenu.dark")}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("system")}>
-          <Monitor className="mr-2 size-4" /> System
+          <Monitor className="mr-2 size-4" /> {tr(lang, "sidebar.userMenu.system")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-          <LogOut className="mr-2 size-4" /> Log out
+          <LogOut className="mr-2 size-4" /> {tr(lang, "sidebar.userMenu.logout")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

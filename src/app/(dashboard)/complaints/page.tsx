@@ -16,8 +16,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeSmart } from "@/lib/utils";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function ComplaintsPage() {
+  const { lang } = useLanguage();
   const [page, setPage] = useState(1);
   const [limit] = useState(15);
   const [search, setSearch] = useState("");
@@ -38,52 +41,63 @@ export default function ComplaintsPage() {
   const tickets: Ticket[] = data?.tickets ?? [];
   const pagination = data?.pagination;
 
+  const getStatusKey = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'open': 'open',
+      'in_progress': 'inProgress',
+      'assigned': 'assigned',
+      'resolved': 'resolved',
+      'closed': 'closed',
+    };
+    return statusMap[status] || status;
+  };
+
   return (
     <Card>
       <CardContent className="grid gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
           <div className="flex flex-1 flex-wrap gap-2">
-            <Input className="w-full sm:w-[360px]" placeholder="Search title/description/number…" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
+            <Input className="w-full sm:w-[360px]" placeholder={tr(lang, "complaints.filters.searchPlaceholder")} value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
             <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.status")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All status</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in_progress">In progress</SelectItem>
-                <SelectItem value="assigned">Assigned</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="all">{tr(lang, "complaints.filters.status.all")}</SelectItem>
+                <SelectItem value="open">{tr(lang, "complaints.filters.status.open")}</SelectItem>
+                <SelectItem value="in_progress">{tr(lang, "complaints.filters.status.inProgress")}</SelectItem>
+                <SelectItem value="assigned">{tr(lang, "complaints.filters.status.assigned")}</SelectItem>
+                <SelectItem value="resolved">{tr(lang, "complaints.filters.status.resolved")}</SelectItem>
+                <SelectItem value="closed">{tr(lang, "complaints.filters.status.closed")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
-              <SelectTrigger className="w-[220px]"><SelectValue placeholder="Category" /></SelectTrigger>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder={tr(lang, "complaints.filters.category")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-                <SelectItem value="sanitation">Sanitation</SelectItem>
-                <SelectItem value="water_supply">Water Supply</SelectItem>
-                <SelectItem value="electricity">Electricity</SelectItem>
-                <SelectItem value="roads">Roads</SelectItem>
-                <SelectItem value="streetlights">Streetlights</SelectItem>
-                <SelectItem value="drainage">Drainage</SelectItem>
-                <SelectItem value="public_safety">Public Safety</SelectItem>
-                <SelectItem value="healthcare">Healthcare</SelectItem>
-                <SelectItem value="education">Education</SelectItem>
-                <SelectItem value="transport">Transport</SelectItem>
-                <SelectItem value="municipal_services">Municipal Services</SelectItem>
-                <SelectItem value="pollution">Pollution</SelectItem>
-                <SelectItem value="encroachment">Encroachment</SelectItem>
-                <SelectItem value="property_tax_billing">Property Tax/Billing</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
+                <SelectItem value="all">{tr(lang, "complaints.filters.category.all")}</SelectItem>
+                <SelectItem value="sanitation">{tr(lang, "complaints.filters.category.sanitation")}</SelectItem>
+                <SelectItem value="water_supply">{tr(lang, "complaints.filters.category.waterSupply")}</SelectItem>
+                <SelectItem value="electricity">{tr(lang, "complaints.filters.category.electricity")}</SelectItem>
+                <SelectItem value="roads">{tr(lang, "complaints.filters.category.roads")}</SelectItem>
+                <SelectItem value="streetlights">{tr(lang, "complaints.filters.category.streetlights")}</SelectItem>
+                <SelectItem value="drainage">{tr(lang, "complaints.filters.category.drainage")}</SelectItem>
+                <SelectItem value="public_safety">{tr(lang, "complaints.filters.category.publicSafety")}</SelectItem>
+                <SelectItem value="healthcare">{tr(lang, "complaints.filters.category.healthcare")}</SelectItem>
+                <SelectItem value="education">{tr(lang, "complaints.filters.category.education")}</SelectItem>
+                <SelectItem value="transport">{tr(lang, "complaints.filters.category.transport")}</SelectItem>
+                <SelectItem value="municipal_services">{tr(lang, "complaints.filters.category.municipalServices")}</SelectItem>
+                <SelectItem value="pollution">{tr(lang, "complaints.filters.category.pollution")}</SelectItem>
+                <SelectItem value="encroachment">{tr(lang, "complaints.filters.category.encroachment")}</SelectItem>
+                <SelectItem value="property_tax_billing">{tr(lang, "complaints.filters.category.propertyTaxBilling")}</SelectItem>
+                <SelectItem value="other">{tr(lang, "complaints.filters.category.other")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Priority" /></SelectTrigger>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.priority")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All priorities</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="all">{tr(lang, "complaints.filters.priority.all")}</SelectItem>
+                <SelectItem value="low">{tr(lang, "complaints.filters.priority.low")}</SelectItem>
+                <SelectItem value="medium">{tr(lang, "complaints.filters.priority.medium")}</SelectItem>
+                <SelectItem value="high">{tr(lang, "complaints.filters.priority.high")}</SelectItem>
+                <SelectItem value="urgent">{tr(lang, "complaints.filters.priority.urgent")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -93,13 +107,12 @@ export default function ComplaintsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Ticket #</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Sender</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned Teams</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead>{tr(lang, "complaints.table.ticketNumber")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.title")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.priority")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.status")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.assignedTeams")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.created")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -109,7 +122,6 @@ export default function ComplaintsPage() {
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-64" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
@@ -119,27 +131,13 @@ export default function ComplaintsPage() {
                 </>
               )}
               {!isLoading && tickets.length === 0 && (
-                <TableRow><TableCell colSpan={7}>No complaints</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6}>{tr(lang, "complaints.empty.none")}</TableCell></TableRow>
               )}
               {tickets.map((t) => (
                 <TableRow key={t._id}>
                   <TableCell><Link className="underline" href={`/complaints/${t._id}`}>{t.ticketNumber ?? t._id}</Link></TableCell>
                   <TableCell>
                     <span className="block max-w-[420px] truncate" title={t.title}>{t.title}</span>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const cb = t.createdBy as unknown;
-                      if (typeof cb === 'string') {
-                        return <span className="block max-w-[220px] truncate" title={cb}>{cb}</span>;
-                      }
-                      if (cb && typeof cb === 'object') {
-                        const o = cb as Record<string, unknown>;
-                        const userName = (o.fullName as string) ?? (o.email as string) ?? 'User';
-                        return <span className="block max-w-[220px] truncate" title={userName}>{userName}</span>;
-                      }
-                      return <span className="text-muted-foreground">-</span>;
-                    })()}
                   </TableCell>
                   <TableCell className="capitalize">
                     {t.priority ? (
@@ -154,7 +152,7 @@ export default function ComplaintsPage() {
                             : 'rounded px-2 py-0.5 text-xs bg-red-600/20 text-red-800 dark:text-red-300'
                         }
                       >
-                        {t.priority.replace(/_/g, ' ')}
+                        {tr(lang, `complaints.priority.${t.priority}`)}
                       </span>
                     ) : (
                       '-'
@@ -166,7 +164,7 @@ export default function ComplaintsPage() {
                       t.status === 'in_progress' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
                       t.status === 'resolved' ? 'rounded px-2 py-0.5 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
                       'rounded px-2 py-0.5 text-xs bg-neutral-500/15 text-neutral-700 dark:text-neutral-300'
-                    }>{t.status.replace(/_/g, ' ')}</span>
+                    }>{tr(lang, `complaints.status.${getStatusKey(t.status)}`)}</span>
                   </TableCell>
                   <TableCell>
                     {t.assignedTeams && t.assignedTeams.length > 0 ? (
@@ -178,7 +176,7 @@ export default function ComplaintsPage() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground text-sm">No teams assigned</span>
+                      <span className="text-muted-foreground text-sm">{tr(lang, "complaints.table.noTeams")}</span>
                     )}
                   </TableCell>
                   <TableCell>{formatDateTimeSmart(t.createdAt)}</TableCell>

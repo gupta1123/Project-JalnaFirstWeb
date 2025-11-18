@@ -13,8 +13,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Mail, Phone, User as UserIcon, Users, Crown } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { lang } = useLanguage();
   const router = useRouter();
   const { id: staffId } = use(params);
 
@@ -25,12 +28,12 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   );
 
   if (isLoading) return <StaffDetailSkeleton />;
-  if (error || !staff) return <StaffNotFound onBack={() => router.back()} />;
+  if (error || !staff) return <StaffNotFound onBack={() => router.back()} lang={lang} />;
 
   return (
     <div className="space-y-6">
-      <StaffHeader staff={staff} onBack={() => router.back()} />
-      <StaffContent staff={staff} />
+      <StaffHeader staff={staff} onBack={() => router.back()} lang={lang} />
+      <StaffContent staff={staff} lang={lang} />
     </div>
   );
 }
@@ -50,23 +53,23 @@ function StaffDetailSkeleton() {
 }
 
 // Not found component
-function StaffNotFound({ onBack }: { onBack: () => void }) {
+function StaffNotFound({ onBack, lang }: { onBack: () => void; lang: "en" | "hi" | "mr" }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
       <div className="rounded-full bg-muted p-4 mb-4">
         <UserIcon className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h2 className="text-2xl font-semibold mb-2">Staff Member Not Found</h2>
-      <p className="text-muted-foreground mb-6">The staff member you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+      <h2 className="text-2xl font-semibold mb-2">{tr(lang, "staffDetail.notFound.title")}</h2>
+      <p className="text-muted-foreground mb-6">{tr(lang, "staffDetail.notFound.description")}</p>
       <Button onClick={onBack} variant="outline">
-        <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+        <ArrowLeft className="h-4 w-4 mr-2" /> {tr(lang, "staffDetail.notFound.goBack")}
       </Button>
     </div>
   );
 }
 
 // Header component
-function StaffHeader({ staff, onBack }: { staff: User; onBack: () => void }) {
+function StaffHeader({ staff, onBack, lang }: { staff: User; onBack: () => void; lang: "en" | "hi" | "mr" }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -101,10 +104,10 @@ function StaffHeader({ staff, onBack }: { staff: User; onBack: () => void }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge isActive={staff.isActive} />
+          <StatusBadge isActive={staff.isActive} lang={lang} />
           {staff.isEmailVerified && (
             <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20">
-              Verified
+              {tr(lang, "staffDetail.badge.verified")}
             </Badge>
           )}
         </div>
@@ -120,69 +123,69 @@ function StaffHeader({ staff, onBack }: { staff: User; onBack: () => void }) {
 }
 
 // Main content component
-function StaffContent({ staff }: { staff: User }) {
+function StaffContent({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
-        <PersonalInfoCard staff={staff} />
-        <ContactInfoCard staff={staff} />
+        <PersonalInfoCard staff={staff} lang={lang} />
+        <ContactInfoCard staff={staff} lang={lang} />
       </div>
-      <TeamInfoCard staff={staff} />
+      <TeamInfoCard staff={staff} lang={lang} />
     </div>
   );
 }
 
 // Personal information card
-function PersonalInfoCard({ staff }: { staff: User }) {
+function PersonalInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <UserIcon className="h-4 w-4" />
-          Personal Information
+          {tr(lang, "staffDetail.cards.personalInfo")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <InfoRow label="Full Name" value={staff.fullName} />
-        <InfoRow label="First Name" value={staff.firstName} />
-        <InfoRow label="Last Name" value={staff.lastName} />
+        <InfoRow label={tr(lang, "staffDetail.labels.fullName")} value={staff.fullName} lang={lang} />
+        <InfoRow label={tr(lang, "staffDetail.labels.firstName")} value={staff.firstName} lang={lang} />
+        <InfoRow label={tr(lang, "staffDetail.labels.lastName")} value={staff.lastName} lang={lang} />
       </CardContent>
     </Card>
   );
 }
 
 // Contact information card
-function ContactInfoCard({ staff }: { staff: User }) {
+function ContactInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Mail className="h-4 w-4" />
-          Contact Information
+          {tr(lang, "staffDetail.cards.contactInfo")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <span className="text-sm font-medium text-muted-foreground">Email Address</span>
+          <span className="text-sm font-medium text-muted-foreground">{tr(lang, "staffDetail.labels.emailAddress")}</span>
           <div className="flex items-center gap-2">
             <Mail className="h-3 w-3 text-muted-foreground" />
             <span className="text-sm">{staff.email}</span>
             {staff.isEmailVerified && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0.5">Verified</Badge>
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5">{tr(lang, "staffDetail.badge.verified")}</Badge>
             )}
           </div>
         </div>
         
         <div className="space-y-1">
-          <span className="text-sm font-medium text-muted-foreground">Phone Number</span>
+          <span className="text-sm font-medium text-muted-foreground">{tr(lang, "staffDetail.labels.phoneNumber")}</span>
           <div className="flex items-center gap-2">
             <Phone className="h-3 w-3 text-muted-foreground" />
-            <span className="text-sm">{staff.phoneNumber || 'Not provided'}</span>
+            <span className="text-sm">{staff.phoneNumber || tr(lang, "staffDetail.labels.notProvided")}</span>
           </div>
         </div>
 
         {staff.preferredLanguage && (
-          <InfoRow label="Language" value={staff.preferredLanguage} className="capitalize" />
+          <InfoRow label={tr(lang, "staffDetail.labels.language")} value={staff.preferredLanguage} className="capitalize" lang={lang} />
         )}
       </CardContent>
     </Card>
@@ -190,9 +193,9 @@ function ContactInfoCard({ staff }: { staff: User }) {
 }
 
 // Team information card
-function TeamInfoCard({ staff }: { staff: User }) {
+function TeamInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
   const getRoleDisplay = (isLeader: boolean) => {
-    return isLeader ? "Team Lead" : "Staff";
+    return isLeader ? tr(lang, "staffDetail.role.teamLead") : tr(lang, "staffDetail.role.staff");
   };
 
   const getRoleBadgeVariant = (isLeader: boolean) => {
@@ -204,7 +207,7 @@ function TeamInfoCard({ staff }: { staff: User }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="h-4 w-4" />
-          Team Information
+          {tr(lang, "staffDetail.cards.teamInfo")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -227,7 +230,7 @@ function TeamInfoCard({ staff }: { staff: User }) {
                 </div>
                 {team.leaderName && !team.isLeader && (
                   <div className="text-xs text-muted-foreground">
-                    Team Lead: {team.leaderName}
+                    {tr(lang, "staffDetail.team.leadLabel")}: {team.leaderName}
                   </div>
                 )}
               </div>
@@ -236,7 +239,7 @@ function TeamInfoCard({ staff }: { staff: User }) {
         ) : (
           <div className="text-center py-4">
             <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">No team assigned</p>
+            <p className="text-sm text-muted-foreground">{tr(lang, "staffDetail.team.noTeam")}</p>
           </div>
         )}
       </CardContent>
@@ -245,19 +248,21 @@ function TeamInfoCard({ staff }: { staff: User }) {
 }
 
 // Utility components
-function InfoRow({ label, value, className = "" }: { label: string; value?: string; className?: string }) {
+function InfoRow({ label, value, className = "", lang }: { label: string; value?: string; className?: string; lang?: "en" | "hi" | "mr" }) {
+  const currentLang = lang || "en";
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm font-medium text-muted-foreground">{label}</span>
-      <span className={`text-sm ${className}`}>{value || 'Not provided'}</span>
+      <span className={`text-sm ${className}`}>{value || tr(currentLang, "staffDetail.labels.notProvided")}</span>
     </div>
   );
 }
 
-function StatusBadge({ isActive }: { isActive?: boolean }) {
+function StatusBadge({ isActive, lang }: { isActive?: boolean; lang?: "en" | "hi" | "mr" }) {
+  const currentLang = lang || "en";
   return (
     <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
-      {isActive ? 'Active' : 'Inactive'}
+      {isActive ? tr(currentLang, "staffDetail.badge.active") : tr(currentLang, "staffDetail.badge.inactive")}
     </Badge>
   );
 }

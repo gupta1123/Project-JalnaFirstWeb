@@ -7,53 +7,54 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, Plus, Check, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
-import type { Ticket, TicketStatus, User, Team, ChangedBy } from "@/lib/types";
-import { adminGetTicketById, adminUpdateTicketStatus, adminAddNote, adminGetTicketHistory, assignTeamsToTicket, getTeams, getTicketAttachments } from "@/lib/api";
-import { useEffect, useMemo, useState } from "react";
+import type { Ticket, TicketStatus, User, ChangedBy } from "@/lib/types";
+import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments } from "@/lib/api";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 
 // Helper function to format role display
-const formatUserRole = (user: ChangedBy | User) => {
+const formatUserRole = (user: ChangedBy | User, lang: "en" | "hi" | "mr") => {
   if (!user) return '';
 
   // Check for admin role
   if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
-    return 'Admin';
+    return tr(lang, "complaintDetail.role.admin");
   }
 
   // Check for team leader (staff with isTeamLeader: true)
   if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
-    return 'Team Lead';
+    return tr(lang, "complaintDetail.role.teamLead");
   }
 
   // Check for staff
   if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
-    return 'Staff';
+    return tr(lang, "complaintDetail.role.staff");
   }
 
   // Check for team leader display role
   if ('displayRole' in user && user.displayRole === 'team_leader') {
-    return 'Team Lead';
+    return tr(lang, "complaintDetail.role.teamLead");
   }
 
   return '';
 };
 
 // Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | ChangedBy) => {
-  if (!changedBy) return 'Unknown User';
+const formatChangedBy = (changedBy: string | User | ChangedBy, lang: "en" | "hi" | "mr") => {
+  if (!changedBy) return tr(lang, "complaintDetail.unknownUser");
 
   if (typeof changedBy === 'string') return changedBy;
 
   // Handle User type with role information
-  const userRole = formatUserRole(changedBy);
+  const userRole = formatUserRole(changedBy, lang);
   const userName = changedBy.fullName ||
     (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
     changedBy.email ||
@@ -66,7 +67,7 @@ const formatChangedBy = (changedBy: string | User | ChangedBy) => {
   // Fallback to name only if available
   if (userName) return userName;
 
-  return 'Unknown User';
+  return tr(lang, "complaintDetail.unknownUser");
 };
 
 // Helper function to open location in Google Maps
@@ -79,10 +80,22 @@ const openInGoogleMaps = (ticket: Ticket) => {
 };
 
 export default function ComplaintDetailPage() {
+  const { lang } = useLanguage();
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
   const { data, isLoading, mutate } = useSWR(id ? ["ticket-admin", id] : null, () => adminGetTicketById(id));
   const ticket = data as Ticket | undefined;
+
+  const getStatusKey = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'open': 'open',
+      'in_progress': 'inProgress',
+      'assigned': 'assigned',
+      'resolved': 'resolved',
+      'closed': 'closed',
+    };
+    return statusMap[status] || status;
+  };
 
 
 
@@ -105,12 +118,6 @@ export default function ComplaintDetailPage() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
-  const [assignTeamsOpen, setAssignTeamsOpen] = useState(false);
-
-
-  const { data: teamsData } = useSWR("teams", () => getTeams({ page: 1, limit: 100 }));
-  const teams: Team[] = teamsData?.teams ?? [];
-
   const created = useMemo(() => formatDateTimeSmart(ticket?.createdAt), [ticket?.createdAt]);
   const updated = useMemo(() => formatDateTimeSmart(ticket?.updatedAt), [ticket?.updatedAt]);
   const isClosed = ticket?.status === 'closed';
@@ -136,23 +143,6 @@ export default function ComplaintDetailPage() {
   const isVideo = (m?: string) => Boolean(m && m.startsWith("video/"));
   const isPdf = (m?: string) => m === "application/pdf";
 
-  const handleAssignTeams = async (teamIds: string[]) => {
-    if (!id) return;
-    setSubmitting(true);
-    try {
-      await assignTeamsToTicket(id, teamIds, 'replace');
-      // Also update status to "assigned" when teams are assigned
-      await adminUpdateTicketStatus(id, { status: "assigned" });
-      toast.success("Teams assigned successfully and status updated to assigned");
-      mutate(); 
-      setAssignTeamsOpen(false);
-    } catch (error) {
-      toast.error("Failed to assign teams");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   function statusBadgeClass(s: TicketStatus) {
     if (s === "open") return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20";
     if (s === "in_progress") return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20";
@@ -173,11 +163,11 @@ export default function ComplaintDetailPage() {
       setSubmitting(true);
       await adminAddNote(id, note.trim());
       setNote("");
-      toast.success("Note added");
+      toast.success(tr(lang, "complaintDetail.addNoteModal.success"));
       await mutate();
       await mutateHistory();
     } catch {
-      toast.error("Failed to add note");
+      toast.error(tr(lang, "complaintDetail.addNoteModal.error"));
     } finally {
       setSubmitting(false);
     }
@@ -204,7 +194,7 @@ export default function ComplaintDetailPage() {
                   <Hash className="size-4 text-muted-foreground" />
                   <span className="font-medium">{ticket.ticketNumber ?? ticket._id}</span>
                   <Button size="sm" variant="ghost" className="h-7 px-2" onClick={copyId}>
-                    <Clipboard className="size-4" /> {copiedId ? "Copied" : "Copy"}
+                    <Clipboard className="size-4" /> {copiedId ? tr(lang, "complaintDetail.copied") : tr(lang, "complaintDetail.copy")}
                   </Button>
                 </div>
 
@@ -215,13 +205,13 @@ export default function ComplaintDetailPage() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 justify-end">
-                    <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}>Add note</Button>
+                    <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}>{tr(lang, "complaintDetail.addNote")}</Button>
                   </div>
                 </div>
               </div>
               <div className="text-base font-medium break-words break-all whitespace-pre-wrap">{ticket.title}</div>
               <div className="text-sm text-muted-foreground leading-relaxed break-words break-all whitespace-pre-wrap">{ticket.description}</div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="size-3.5" /> Created: {created} • Updated: {updated}</div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="size-3.5" /> {tr(lang, "complaintDetail.created")}: {created} • {tr(lang, "complaintDetail.updated")}: {updated}</div>
               {ticket.tags && ticket.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
                   {ticket.tags.map((t, i) => (
@@ -248,34 +238,11 @@ export default function ComplaintDetailPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium flex items-center gap-2">
                     <Users className="size-4 text-muted-foreground" /> 
-                    Assigned Teams
+                    {tr(lang, "complaintDetail.assignedTeams")}
                   </div>
-                  {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="capitalize">
-                        {ticket.assignedTeams.length} team{ticket.assignedTeams.length !== 1 ? 's' : ''}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={true}
-                        className="opacity-50 cursor-not-allowed"
-                      >
-                        <Users className="size-3 mr-1" />
-                        Teams Assigned
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setAssignTeamsOpen(true)}
-                      disabled={submitting}
-                    >
-                      <Plus className="size-3 mr-1" />
-                      Assign Teams
-                    </Button>
-                  )}
+                  <Badge variant="secondary" className="capitalize">
+                    {ticket.assignedTeams?.length ?? 0} {(ticket.assignedTeams?.length ?? 0) !== 1 ? tr(lang, "complaintDetail.teams") : tr(lang, "complaintDetail.team")}
+                  </Badge>
                 </div>
                 
                 {ticket.assignedTeams && ticket.assignedTeams.length > 0 ? (
@@ -284,7 +251,7 @@ export default function ComplaintDetailPage() {
                       <div key={team._id} className="rounded border p-3 bg-muted/30">
                         <div className="flex items-start justify-between mb-1">
                           <div className="font-medium text-sm">{team.name}</div>
-                          <Badge variant="outline" className="text-xs">Active</Badge>
+                          <Badge variant="outline" className="text-xs">{tr(lang, "complaintDetail.active")}</Badge>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {team.areas && team.areas.length > 0 ? (
@@ -296,13 +263,13 @@ export default function ComplaintDetailPage() {
                                 </div>
                               ))}
                               {team.areas.length > 2 && (
-                                <div className="text-xs opacity-70">+{team.areas.length - 2} more areas</div>
+                                <div className="text-xs opacity-70">+{team.areas.length - 2} {tr(lang, "complaintDetail.moreAreas")}</div>
                               )}
                             </div>
                           ) : (
                             <div className="flex items-center gap-1">
                               <MapPin className="size-3" />
-                              <span>No specific areas</span>
+                              <span>{tr(lang, "complaintDetail.noSpecificAreas")}</span>
                             </div>
                           )}
                         </div>
@@ -311,7 +278,7 @@ export default function ComplaintDetailPage() {
                   </div>
                 ) : (
                   <div className="text-center py-6 text-sm text-muted-foreground">
-                    No teams assigned to this complaint
+                    {tr(lang, "complaintDetail.noTeamsAssigned")}
                   </div>
                 )}
               </div>
@@ -322,7 +289,7 @@ export default function ComplaintDetailPage() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="size-5 text-blue-600" />
-                      Incident Location
+                      {tr(lang, "complaintDetail.incidentLocation")}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -336,10 +303,10 @@ export default function ComplaintDetailPage() {
                             </div>
                             <div>
                               <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                                Precise Location Available
+                                {tr(lang, "complaintDetail.preciseLocationAvailable")}
                               </p>
                               <p className="text-xs text-blue-700 dark:text-blue-300">
-                                GPS coordinates captured from the report
+                                {tr(lang, "complaintDetail.gpsCoordinatesHelper")}
                               </p>
                             </div>
                           </div>
@@ -350,7 +317,7 @@ export default function ComplaintDetailPage() {
                             className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300"
                           >
                             <ExternalLink className="size-4 mr-2" />
-                            View on Map
+                            {tr(lang, "complaintDetail.viewOnMap")}
                           </Button>
                         </div>
                       )}
@@ -359,7 +326,7 @@ export default function ComplaintDetailPage() {
                       {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
                         <div className="text-center py-6 text-muted-foreground">
                           <MapPin className="size-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No location information available</p>
+                          <p className="text-sm">{tr(lang, "complaintDetail.noLocationInfo")}</p>
                         </div>
                       )}
                     </div>
@@ -372,13 +339,13 @@ export default function ComplaintDetailPage() {
             <div className="grid grid-cols-1 gap-3">
               <div>
                 <Card>
-                  <CardHeader className="pb-2"><CardTitle>Notes & Activity</CardTitle></CardHeader>
+                  <CardHeader className="pb-2"><CardTitle>{tr(lang, "complaintDetail.notesAndActivity")}</CardTitle></CardHeader>
                   <CardContent>
                     <Tabs defaultValue="activity" className="w-full">
                       <TabsList>
-                        <TabsTrigger value="activity">Activity</TabsTrigger>
-                        <TabsTrigger value="notes">Notes</TabsTrigger>
-                        <TabsTrigger value="attachments">Attachments</TabsTrigger>
+                        <TabsTrigger value="activity">{tr(lang, "complaintDetail.tabs.activity")}</TabsTrigger>
+                        <TabsTrigger value="notes">{tr(lang, "complaintDetail.tabs.notes")}</TabsTrigger>
+                        <TabsTrigger value="attachments">{tr(lang, "complaintDetail.tabs.attachments")}</TabsTrigger>
                       </TabsList>
                       <TabsContent value="activity" className="mt-4">
                         {historyItems.length === 0 ? (
@@ -386,9 +353,9 @@ export default function ComplaintDetailPage() {
                             <div className="rounded-full bg-muted p-3 w-fit mx-auto mb-3">
                               <Flag className="size-6 text-muted-foreground" />
                             </div>
-                            <div className="text-sm text-muted-foreground">No activity yet</div>
+                            <div className="text-sm text-muted-foreground">{tr(lang, "complaintDetail.noActivity")}</div>
                             <div className="text-xs text-muted-foreground mt-1">
-                              Changes and updates will appear here
+                              {tr(lang, "complaintDetail.noActivityHelper")}
                             </div>
                           </div>
                         ) : (
@@ -405,7 +372,7 @@ export default function ComplaintDetailPage() {
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <Badge variant="outline" className="text-xs">
-                                          {h.changeType?.replace(/_/g, " ") ?? "Change"}
+                                          {h.changeType?.replace(/_/g, " ") ?? tr(lang, "complaintDetail.change")}
                                         </Badge>
                                         {h.field && (
                                           <span className="text-xs text-muted-foreground">
@@ -423,23 +390,23 @@ export default function ComplaintDetailPage() {
                                     <div className="text-sm">
                                       {h.field === 'status' ? (
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <span>Status changed from</span>
+                                          <span>{tr(lang, "complaintDetail.statusChangedFrom")}</span>
                                           <Badge variant="outline" className={`capitalize ${statusBadgeClass((h.oldValue as TicketStatus) ?? 'open')}`}>
-                                            {(h.oldValue ?? '').toString().replace(/_/g, ' ')}
+                                            {tr(lang, `complaints.status.${getStatusKey((h.oldValue ?? '').toString())}`)}
                                           </Badge>
-                                          <span>to</span>
+                                          <span>{tr(lang, "complaintDetail.statusChangedTo")}</span>
                                           <Badge variant="outline" className={`capitalize ${statusBadgeClass((h.newValue as TicketStatus) ?? 'open')}`}>
-                                            {(h.newValue ?? '').toString().replace(/_/g, ' ')}
+                                            {tr(lang, `complaints.status.${getStatusKey((h.newValue ?? '').toString())}`)}
                                           </Badge>
                                         </div>
                                       ) : (
-                                        <div>{h.description ?? `${h.field ?? 'Field'} updated`}</div>
+                                        <div>{h.description ?? `${h.field ?? tr(lang, "complaintDetail.change")} ${tr(lang, "complaintDetail.fieldUpdated")}`}</div>
                                       )}
                                     </div>
                                     
                                     {h.changedBy && (
                                       <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
-                                        Changed by: {formatChangedBy(h.changedBy)}
+                                        {tr(lang, "complaintDetail.changedBy")}: {formatChangedBy(h.changedBy, lang)}
                                       </div>
                                     )}
                                   </div>
@@ -459,7 +426,7 @@ export default function ComplaintDetailPage() {
                               <div className="opacity-70 mt-1">
                                 {formatDateTimeSmart(n.addedAt)}
                                 {n.addedBy && (
-                                  <span> • by {formatChangedBy(n.addedBy)}</span>
+                                  <span> • by {formatChangedBy(n.addedBy, lang)}</span>
                                 )}
                               </div>
                             )}
@@ -467,7 +434,7 @@ export default function ComplaintDetailPage() {
                 ))}
                           </div>
                         ) : (
-                          <div className="text-xs text-muted-foreground">No notes yet</div>
+                          <div className="text-xs text-muted-foreground">{tr(lang, "complaintDetail.noNotes")}</div>
                         )}
                       </TabsContent>
                       <TabsContent value="attachments" className="mt-4">
@@ -477,7 +444,7 @@ export default function ComplaintDetailPage() {
                             <Skeleton className="h-16 w-3/4" />
                           </div>
                         ) : attachments.length === 0 ? (
-                          <div className="text-xs text-muted-foreground">No attachments</div>
+                          <div className="text-xs text-muted-foreground">{tr(lang, "complaintDetail.noAttachments")}</div>
                         ) : (
                           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             {attachments.map((att) => (
@@ -489,17 +456,17 @@ export default function ComplaintDetailPage() {
                                   ) : isVideo(att.mimeType) ? (
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                       <Video className="size-12" />
-                                      <span className="text-xs font-medium">VIDEO</span>
+                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.video")}</span>
                                     </div>
                                   ) : isPdf(att.mimeType) ? (
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                       <FileText className="size-12" />
-                                      <span className="text-xs font-medium">PDF</span>
+                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.pdf")}</span>
                                     </div>
                                   ) : (
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                       <File className="size-12" />
-                                      <span className="text-xs font-medium">FILE</span>
+                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.file")}</span>
                                     </div>
                                   )}
                                 </div>
@@ -548,35 +515,18 @@ export default function ComplaintDetailPage() {
       <Dialog open={noteOpen} onOpenChange={setNoteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add admin note</DialogTitle>
-            <DialogDescription>Share a short, clear update for other admins.</DialogDescription>
+            <DialogTitle>{tr(lang, "complaintDetail.addNoteModal.title")}</DialogTitle>
+            <DialogDescription>{tr(lang, "complaintDetail.addNoteModal.description")}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-2">
-            <Textarea rows={5} placeholder="Write a short note..." value={note} onChange={(e) => setNote(e.target.value)} />
+            <Textarea rows={5} placeholder={tr(lang, "complaintDetail.addNoteModal.placeholder")} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button variant="secondary" onClick={() => setNoteOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => setNoteOpen(false)}>{tr(lang, "complaintDetail.addNoteModal.cancel")}</Button>
             <Button onClick={async () => { await addNote(); setNoteOpen(false); }} disabled={submitting || !note.trim()}>
-              {submitting ? "Adding..." : "Add note"}
+              {submitting ? tr(lang, "complaintDetail.addNoteModal.adding") : tr(lang, "complaintDetail.addNoteModal.add")}
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Teams Dialog */}
-      <Dialog open={assignTeamsOpen} onOpenChange={setAssignTeamsOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Assign Teams to Ticket</DialogTitle>
-          </DialogHeader>
-          {ticket && (
-            <AssignTeamsForm
-              ticket={ticket}
-              teams={teams}
-              onAssign={handleAssignTeams}
-              submitting={submitting}
-            />
-          )}
         </DialogContent>
       </Dialog>
 
@@ -589,7 +539,7 @@ export default function ComplaintDetailPage() {
               {previewAttachment && isVideo(previewAttachment.mimeType) && <Video className="size-5" />}
               {previewAttachment && isPdf(previewAttachment.mimeType) && <FileText className="size-5" />}
               {previewAttachment && !isImage(previewAttachment.mimeType) && !isVideo(previewAttachment.mimeType) && !isPdf(previewAttachment.mimeType) && <File className="size-5" />}
-              Preview
+              {tr(lang, "complaintDetail.preview.title")}
             </DialogTitle>
             {previewAttachment && (
               <DialogDescription className="flex items-center justify-between">
@@ -597,7 +547,7 @@ export default function ComplaintDetailPage() {
                 <Button asChild size="sm" variant="outline">
                   <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
                     <ExternalLink className="size-3" />
-                    Open Original
+                    {tr(lang, "complaintDetail.preview.openOriginal")}
                   </a>
                 </Button>
               </DialogDescription>
@@ -615,10 +565,10 @@ export default function ComplaintDetailPage() {
                 <div className="text-center py-12">
                   <File className="size-16 text-muted-foreground mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground">
-                    Preview not available for this file type
+                    {tr(lang, "complaintDetail.preview.notAvailable")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Use &quot;Open Original&quot; to view the file
+                    {tr(lang, "complaintDetail.preview.useOpenOriginal")}
                   </p>
                 </div>
               )
@@ -627,107 +577,6 @@ export default function ComplaintDetailPage() {
         </DialogContent>
       </Dialog>
     </Card>
-  );
-}
-
-// Assign Teams Form Component
-function AssignTeamsForm({
-  ticket,
-  teams,
-  onAssign,
-  submitting,
-}: {
-  ticket: Ticket;
-  teams: Team[];
-  onAssign: (teamIds: string[]) => Promise<void>;
-  submitting: boolean;
-}) {
-  const [selectedTeams, setSelectedTeams] = useState<string[]>(
-    ticket.assignedTeams?.map(t => t._id) || []
-  );
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await onAssign(selectedTeams);
-  };
-
-  const toggleTeam = (teamId: string) => {
-    setSelectedTeams(prev =>
-      prev.includes(teamId)
-        ? prev.filter(id => id !== teamId)
-        : [...prev, teamId]
-    );
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-3">
-        <div className="p-3 bg-muted/50 rounded-lg">
-          <div className="text-sm font-medium">{ticket.ticketNumber || ticket._id}</div>
-          <div className="text-sm text-muted-foreground">{ticket.title}</div>
-          {ticket.location && (
-            <div className="text-xs text-muted-foreground mt-1">
-              {ticket.location.zone && `${ticket.location.zone}, `}
-              {ticket.location.city}, {ticket.location.state}
-            </div>
-          )}
-        </div>
-        
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Select Teams:</label>
-          {teams.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No teams available</p>
-          ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {teams.map((team) => (
-                <div
-                  key={team._id}
-                  className={`
-                    p-3 rounded-lg border cursor-pointer transition-colors
-                    ${selectedTeams.includes(team._id)
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                    }
-                  `}
-                  onClick={() => toggleTeam(team._id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{team.name}</div>
-                    </div>
-                    <div className={`
-                      w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ml-3
-                      ${selectedTeams.includes(team._id)
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-muted-foreground"
-                      }
-                    `}>
-                      {selectedTeams.includes(team._id) && (
-                        <Check className="size-3" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <DialogFooter className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          {selectedTeams.length} team{selectedTeams.length !== 1 ? 's' : ''} selected
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={() => setSelectedTeams([])}>
-            Clear All
-          </Button>
-          <Button type="submit" disabled={submitting || selectedTeams.length === 0}>
-            {submitting ? "Assigning..." : "Assign Teams"}
-          </Button>
-        </div>
-      </DialogFooter>
-    </form>
   );
 }
 

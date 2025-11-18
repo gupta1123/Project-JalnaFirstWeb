@@ -62,8 +62,12 @@ import {
   UserCheck,
   Plus,
 } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
+import type { Lang } from "@/lib/i18n";
 
 export default function TeamMembersPage() {
+  const { lang } = useLanguage();
   const [search, setSearch] = useState("");
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [isRemoveMemberOpen, setIsRemoveMemberOpen] = useState<User | null>(null);
@@ -268,16 +272,16 @@ export default function TeamMembersPage() {
               <div>
                 <div className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
                   <Building2 className="h-5 w-5 opacity-90" />
-                  {team.name} - Team Members
+                  {team.name} - {tr(lang, "teamMembers.heading")}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20 flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {team.employees?.length || 0} members
+                    {team.employees?.length || 0} {tr(lang, "teamMembers.badge.members")}
                   </Badge>
                   <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20 flex items-center gap-1">
                     <Crown className="h-3 w-3" />
-                    Team Lead: {teamLead?.fullName || "Not assigned"}
+                    {tr(lang, "teamMembers.card.roleLead")}: {teamLead?.fullName || tr(lang, "teamMembers.card.notAssigned")}
                   </Badge>
                 </div>
               </div>
@@ -290,7 +294,7 @@ export default function TeamMembersPage() {
               className="bg-foreground/10 text-inherit hover:bg-foreground/20 border-foreground/20"
             >
               <Plus className="h-4 w-4 mr-1" />
-              Add Member
+              {tr(lang, "teamMembers.actions.addMember")}
             </Button>
           </div>
         </motion.div>
@@ -303,10 +307,10 @@ export default function TeamMembersPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Team Members ({filteredMembers.length})
+                {tr(lang, "teamMembers.heading")} ({filteredMembers.length})
               </CardTitle>
               <Input
-                placeholder="Search members..."
+                placeholder={tr(lang, "teamMembers.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-64"
@@ -318,15 +322,15 @@ export default function TeamMembersPage() {
               <div className="text-center py-8">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium">
-                  {search ? "No members found" : "No team members"}
+                  {search ? tr(lang, "teamMembers.empty.searchTitle") : tr(lang, "teamMembers.card.noMembers")}
                 </h3>
                  <p className="text-sm text-muted-foreground mb-4">
-                   {search ? "Try adjusting your search terms" : "Add team members to get started"}
+                   {search ? tr(lang, "teamMembers.empty.searchHelper") : tr(lang, "teamMembers.card.noMembers.helper")}
                  </p>
                  {!search && (
                    <Button onClick={() => setIsAddMemberOpen(true)}>
                      <UserPlus className="h-4 w-4 mr-1" />
-                     Add First Member
+                    {tr(lang, "teamMembers.actions.addMember")}
                    </Button>
                  )}
               </div>
@@ -347,7 +351,7 @@ export default function TeamMembersPage() {
                       </Avatar>
                       <div>
                          <div className="flex items-center gap-2">
-                           <span className="font-medium">{member.fullName}</span>
+                    <span className="font-medium">{member.fullName}</span>
                          </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
                           <div className="flex items-center gap-1">
@@ -373,12 +377,12 @@ export default function TeamMembersPage() {
                         <DropdownMenuContent align="end" className="w-48">
                           <Link href={`/team-members/${member._id}`}>
                             <DropdownMenuItem>
-                              <Eye className="h-4 w-4" /> View Details
+                              <Eye className="h-4 w-4" /> {tr(lang, "teamMembers.menu.view")}
                             </DropdownMenuItem>
                           </Link>
                           <Link href={`/team-members/${member._id}/edit`}>
                             <DropdownMenuItem>
-                              <Edit className="h-4 w-4" /> Edit Staff
+                              <Edit className="h-4 w-4" /> {tr(lang, "teamMembers.menu.edit")}
                             </DropdownMenuItem>
                           </Link>
                           <DropdownMenuSeparator />
@@ -386,7 +390,7 @@ export default function TeamMembersPage() {
                             onClick={() => setIsRemoveMemberOpen(member)}
                             className="text-destructive"
                           >
-                            <Trash2 className="h-4 w-4" /> Remove from Team
+                            <Trash2 className="h-4 w-4" /> {tr(lang, "teamMembers.menu.remove")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -404,32 +408,34 @@ export default function TeamMembersPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-5 w-5" />
-                Team Information
+                {tr(lang, "teamMembers.info.title")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <h4 className="font-medium mb-2">Description</h4>
+                <h4 className="font-medium mb-2">{tr(lang, "teamMembers.info.description")}</h4>
                 <p className="text-sm text-muted-foreground">
-                  {team.description || "No description provided"}
+                  {team.description || tr(lang, "teamMembers.info.none")}
                 </p>
               </div>
               
               <div>
-                <h4 className="font-medium mb-2">Coverage Areas</h4>
+                <h4 className="font-medium mb-2">{tr(lang, "teamMembers.info.coverage")}</h4>
                 <div className="space-y-2">
-                  {team.areas?.map((area, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                      <div>
-                        <div className="font-medium">{area.zone}</div>
-                        <div className="text-muted-foreground">
-                          {[area.area, area.city, area.state].filter(Boolean).join(', ')}
+                  {team.areas?.length ? (
+                    team.areas.map((area, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div>
+                          <div className="font-medium">{area.zone}</div>
+                          <div className="text-muted-foreground">
+                            {[area.area, area.city, area.state].filter(Boolean).join(', ')}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )) || (
-                    <div className="text-sm text-muted-foreground">No coverage areas defined</div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground">{tr(lang, "teamMembers.info.none")}</div>
                   )}
                 </div>
               </div>
@@ -442,12 +448,12 @@ export default function TeamMembersPage() {
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
+            <DialogTitle>{tr(lang, "teamMembers.modal.title")}</DialogTitle>
           </DialogHeader>
           <Tabs defaultValue="existing" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="existing">Add Existing Staff</TabsTrigger>
-              <TabsTrigger value="create">Create New Staff</TabsTrigger>
+              <TabsTrigger value="existing">{tr(lang, "teamMembers.modal.tabExisting")}</TabsTrigger>
+              <TabsTrigger value="create">{tr(lang, "teamMembers.modal.tabCreate")}</TabsTrigger>
             </TabsList>
             
             <TabsContent value="existing" className="mt-4">
@@ -455,11 +461,12 @@ export default function TeamMembersPage() {
                 <div className="flex items-center justify-center py-8">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-sm text-muted-foreground">Loading staff data...</p>
+                    <p className="text-sm text-muted-foreground">{tr(lang, "teamMembers.modal.loadingStaff")}</p>
                   </div>
                 </div>
               ) : (
                 <AddExistingMemberForm 
+                  lang={lang}
                   teamId={team?._id || ""}
                   team={team}
                   unassignedStaff={unassignedStaff}
@@ -471,6 +478,7 @@ export default function TeamMembersPage() {
             
             <TabsContent value="create" className="mt-4">
               <CreateNewMemberForm 
+                lang={lang}
                 teamId={team?._id || ""}
                 team={team}
                 onAddMember={onAddMember}
@@ -542,12 +550,14 @@ export default function TeamMembersPage() {
 
 // Add Existing Member Form Component (showing only unassigned staff members)
 function AddExistingMemberForm({ 
+  lang,
   teamId, 
   team, 
   unassignedStaff, 
   onAddMember, 
   submitting,
 }: {
+  lang: Lang;
   teamId: string;
   team?: Team;
   unassignedStaff: User[];
@@ -573,7 +583,7 @@ function AddExistingMemberForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStaff) {
-      toast.error("Please select a staff member");
+      toast.error(tr(lang, "teamMembers.modal.toast.selectStaff"));
       return;
     }
     await onAddMember(teamId, selectedStaff);
@@ -582,14 +592,14 @@ function AddExistingMemberForm({
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <label className="text-sm font-medium">Select Staff Member</label>
+        <label className="text-sm font-medium">{tr(lang, "teamMembers.modal.selectLabel")}</label>
         <Select value={selectedStaff} onValueChange={setSelectedStaff}>
           <SelectTrigger>
-            <SelectValue placeholder="Choose a staff member to add" />
+            <SelectValue placeholder={tr(lang, "teamMembers.modal.selectPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
             {unassignedStaff.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">No unassigned staff members available</div>
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">{tr(lang, "teamMembers.modal.noUnassigned")}</div>
             ) : (
               unassignedStaff.map((staff) => (
                 <SelectItem key={staff._id} value={staff._id}>
@@ -606,10 +616,10 @@ function AddExistingMemberForm({
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teamMembers.modal.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={submitting || !selectedStaff || unassignedStaff.length === 0}>
-          {submitting ? "Adding..." : "Add Member"}
+          {submitting ? tr(lang, "teamMembers.modal.adding") : tr(lang, "teamMembers.modal.add")}
         </Button>
       </DialogFooter>
     </form>
@@ -618,11 +628,13 @@ function AddExistingMemberForm({
 
 // Create New Member Form Component
 function CreateNewMemberForm({
+  lang,
   teamId,
   team,
   onAddMember,
   submitting,
 }: {
+  lang: Lang;
   teamId: string;
   team?: Team;
   onAddMember: (teamId: string, employeeId: string) => Promise<void>;
@@ -640,12 +652,12 @@ function CreateNewMemberForm({
     e.preventDefault();
     
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.password.trim() || !formData.phoneNumber.trim()) {
-      toast.error("Please fill all required fields");
+      toast.error(tr(lang, "teamMembers.modal.toast.required"));
       return;
     }
 
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+      toast.error(tr(lang, "teamMembers.modal.toast.passwordLength"));
       return;
     }
 
@@ -671,11 +683,11 @@ function CreateNewMemberForm({
         phoneNumber: "",
       });
       
-      toast.success("Staff member created and added to team successfully");
+      toast.success(tr(lang, "teamMembers.modal.toast.createSuccess"));
     } catch (error: unknown) {
       const errorMessage = (error as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error || 
                           (error as { message?: string })?.message || 
-                          "Failed to create staff member";
+                          tr(lang, "teamMembers.modal.toast.createError");
       toast.error(errorMessage);
     }
   };
@@ -684,74 +696,74 @@ function CreateNewMemberForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name *</Label>
+          <Label htmlFor="firstName">{tr(lang, "teamMembers.modal.firstName")}</Label>
           <Input
             id="firstName"
             value={formData.firstName}
             onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-            placeholder="John"
+            placeholder={tr(lang, "teamMembers.modal.placeholder.firstName")}
             required
           />
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name *</Label>
+          <Label htmlFor="lastName">{tr(lang, "teamMembers.modal.lastName")}</Label>
           <Input
             id="lastName"
             value={formData.lastName}
             onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-            placeholder="Doe"
+            placeholder={tr(lang, "teamMembers.modal.placeholder.lastName")}
             required
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="email">Email Address *</Label>
+        <Label htmlFor="email">{tr(lang, "teamMembers.modal.email")}</Label>
         <Input
           id="email"
           type="email"
           value={formData.email}
           onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-          placeholder="john.doe@example.com"
+          placeholder={tr(lang, "teamMembers.modal.placeholder.email")}
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="phoneNumber">Phone Number *</Label>
+        <Label htmlFor="phoneNumber">{tr(lang, "teamMembers.modal.phone")}</Label>
         <Input
           id="phoneNumber"
           type="tel"
           value={formData.phoneNumber}
           onChange={(e) => setFormData(prev => ({ ...prev, phoneNumber: e.target.value }))}
-          placeholder="1234567890"
+          placeholder={tr(lang, "teamMembers.modal.placeholder.phone")}
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password *</Label>
+        <Label htmlFor="password">{tr(lang, "teamMembers.modal.password")}</Label>
         <Input
           id="password"
           type="password"
           value={formData.password}
           onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-          placeholder="Enter a secure password"
+          placeholder={tr(lang, "teamMembers.modal.placeholder.password")}
           required
           minLength={6}
         />
         <p className="text-xs text-muted-foreground">
-          Password must be at least 6 characters long
+          {tr(lang, "teamMembers.modal.passwordHint")}
         </p>
       </div>
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teamMembers.modal.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Creating..." : "Create & Add Member"}
+          {submitting ? tr(lang, "teamMembers.modal.creating") : tr(lang, "teamMembers.modal.createButton")}
         </Button>
       </DialogFooter>
     </form>

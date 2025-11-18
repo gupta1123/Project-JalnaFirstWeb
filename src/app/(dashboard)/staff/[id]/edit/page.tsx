@@ -14,8 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Save, User as UserIcon } from "lucide-react";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function EditStaffPage({ params }: { params: Promise<{ id: string }> }) {
+  const { lang } = useLanguage();
   const router = useRouter();
   const { id: staffId } = use(params);
   const [submitting, setSubmitting] = useState(false);
@@ -48,21 +51,19 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.phoneNumber.trim()) {
-      toast.error("Please fill all required fields");
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
+      toast.error(tr(lang, "staffEdit.toast.fillRequired"));
       return;
     }
-    const digitsOnly = (formData.phoneNumber || "").replace(/\D/g, "");
-    if (digitsOnly.length !== 10) return;
 
     setSubmitting(true);
     try {
       await updateStaff(staffId, formData);
-      toast.success("Staff member updated successfully");
+      toast.success(tr(lang, "staffEdit.toast.success"));
       mutate(); // Revalidate SWR cache for this staff member
       router.push("/staff"); // Navigate back to the staff list
     } catch (err) {
-      toast.error("Failed to update staff member");
+      toast.error(tr(lang, "staffEdit.toast.error"));
     } finally {
       setSubmitting(false);
     }
@@ -82,10 +83,10 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
   if (error || !staff) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <h2 className="text-2xl font-semibold mb-2">Staff Member Not Found</h2>
-        <p className="text-muted-foreground">Could not load staff member details.</p>
+        <h2 className="text-2xl font-semibold mb-2">{tr(lang, "staffEdit.notFound.title")}</h2>
+        <p className="text-muted-foreground">{tr(lang, "staffEdit.notFound.description")}</p>
         <Button onClick={() => router.back()} className="mt-4">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+          <ArrowLeft className="h-4 w-4 mr-2" /> {tr(lang, "staffEdit.notFound.goBack")}
         </Button>
       </div>
     );
@@ -113,10 +114,10 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
             <div>
               <div className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
                 <UserIcon className="h-5 w-5 opacity-90" />
-                Edit {staff.fullName || `${staff.firstName} ${staff.lastName}`}
+                {tr(lang, "staffEdit.header.title")} {staff.fullName || `${staff.firstName} ${staff.lastName}`}
               </div>
               <p className="text-sm opacity-90 mt-1">
-                Update staff member information
+                {tr(lang, "staffEdit.header.subtitle")}
               </p>
             </div>
           </div>
@@ -129,14 +130,14 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <UserIcon className="h-5 w-5" />
-              Staff Details
+              {tr(lang, "staffEdit.card.title")}
             </CardTitle>
             <Button 
               variant="outline" 
               onClick={() => router.push("/staff")}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+              {tr(lang, "staffEdit.button.back")}
             </Button>
           </div>
         </CardHeader>
@@ -144,7 +145,7 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
           <form onSubmit={handleSubmit} className="grid gap-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <label className="text-sm font-medium">First Name *</label>
+                <label className="text-sm font-medium">{tr(lang, "staffEdit.labels.firstName")} *</label>
                 <Input
                   value={formData.firstName}
                   onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
@@ -153,7 +154,7 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium">Last Name *</label>
+                <label className="text-sm font-medium">{tr(lang, "staffEdit.labels.lastName")} *</label>
                 <Input
                   value={formData.lastName}
                   onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
@@ -164,33 +165,26 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Email *</label>
+              <label className="text-sm font-medium">{tr(lang, "staffEdit.labels.email")} *</label>
               <Input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                readOnly
+                disabled
                 placeholder="john.doe@example.com"
-                required
+                className="bg-muted cursor-not-allowed"
               />
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Phone Number *</label>
+              <label className="text-sm font-medium">{tr(lang, "staffEdit.labels.phoneNumber")} *</label>
               <Input
                 type="tel"
-                inputMode="numeric"
-                maxLength={10}
                 value={formData.phoneNumber}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
-                  setFormData(prev => ({ ...prev, phoneNumber: digits }));
-                }}
-                placeholder="10-digit number"
-                required
+                readOnly
+                disabled
+                className="bg-muted cursor-not-allowed"
               />
-              {formData.phoneNumber && formData.phoneNumber.length < 10 && (
-                <p className="text-xs text-destructive">Enter 10 digits</p>
-              )}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -202,14 +196,14 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
                 className="rounded border-gray-300"
               />
               <label htmlFor="isActive" className="text-sm font-medium">
-                Active staff member
+                {tr(lang, "staffEdit.labels.active")}
               </label>
             </div>
 
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={submitting} className="flex-1">
                 <Save className="h-4 w-4 mr-2" />
-                {submitting ? "Saving..." : "Save Changes"}
+                {submitting ? tr(lang, "staffEdit.button.saving") : tr(lang, "staffEdit.button.save")}
               </Button>
               <Button 
                 type="button" 
@@ -217,7 +211,7 @@ export default function EditStaffPage({ params }: { params: Promise<{ id: string
                 onClick={() => router.push("/staff")}
                 disabled={submitting}
               >
-                Cancel
+                {tr(lang, "staffEdit.button.cancel")}
               </Button>
             </div>
           </form>

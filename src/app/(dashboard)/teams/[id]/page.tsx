@@ -39,8 +39,11 @@ import {
   User as UserIcon
 } from "lucide-react";
 import Link from "next/link";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function TeamDetailsPage() {
+  const { lang } = useLanguage();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const teamId = params?.id;
@@ -74,11 +77,11 @@ export default function TeamDetailsPage() {
     setSubmitting(true);
     try {
       await addEmployeesToTeam(team._id, [employeeId]);
-      toast.success("Member added to team");
+      toast.success(tr(lang, "teamDetail.addMember.toast.success"));
       setIsAddMemberOpen(false);
       mutate();
     } catch {
-      toast.error("Failed to add member");
+      toast.error(tr(lang, "teamDetail.addMember.toast.error"));
     } finally {
       setSubmitting(false);
     }
@@ -91,11 +94,11 @@ export default function TeamDetailsPage() {
     setSubmitting(true);
     try {
       await updateTeamLeader(team._id, leaderId);
-      toast.success("Team lead updated");
+      toast.success(tr(lang, "teamDetail.changeLeader.toast.success"));
       setIsChangeLeaderOpen(false);
       mutate();
     } catch {
-      toast.error("Failed to update team lead");
+      toast.error(tr(lang, "teamDetail.changeLeader.toast.error"));
     } finally {
       setSubmitting(false);
     }
@@ -167,15 +170,15 @@ export default function TeamDetailsPage() {
                   </Badge>
                   <Badge variant="secondary" className="bg-foreground/10 text-inherit border-foreground/20 flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {team.employees.length} members
+                    {team.employees.length} {tr(lang, "teamDetail.badge.members")}
                   </Badge>
                   {team.isActive ? (
                     <Badge variant="secondary" className="bg-emerald-500/20 text-inherit border-emerald-500/30 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Active
+                      <CheckCircle2 className="h-3 w-3" /> {tr(lang, "teamDetail.badge.active")}
                     </Badge>
                   ) : (
                     <Badge variant="secondary" className="bg-red-500/20 text-inherit border-red-500/30 flex items-center gap-1">
-                      <XCircle className="h-3 w-3" /> Inactive
+                      <XCircle className="h-3 w-3" /> {tr(lang, "teamDetail.badge.inactive")}
                     </Badge>
                   )}
                 </div>
@@ -190,7 +193,7 @@ export default function TeamDetailsPage() {
                 onClick={() => router.push("/teams")}
               >
                 <ArrowLeft className="h-4 w-4 mr-1" />
-                Back to Teams
+                {tr(lang, "teamDetail.button.backToTeams")}
               </Button>
               <Button 
                 size="sm" 
@@ -199,7 +202,7 @@ export default function TeamDetailsPage() {
                 onClick={() => setIsAddMemberOpen(true)}
               >
                 <UserPlus className="h-4 w-4 mr-1" />
-                Add Member
+                {tr(lang, "teamDetail.button.addMember")}
               </Button>
             </div>
           </div>
@@ -210,7 +213,7 @@ export default function TeamDetailsPage() {
         <TabsList className="grid w-full grid-cols-1">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            Overview
+            {tr(lang, "teamDetail.tabs.overview")}
           </TabsTrigger>
         </TabsList>
 
@@ -223,13 +226,13 @@ export default function TeamDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5" />
-                    Team Information
+                    {tr(lang, "teamDetail.teamInfo.title")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="rounded-xl border p-4 bg-muted/20">
                     <p className="text-sm leading-relaxed">
-                      {team.description || "No description provided"}
+                      {team.description || tr(lang, "teamDetail.teamInfo.noDescription")}
                     </p>
                   </div>
                 </CardContent>
@@ -241,7 +244,7 @@ export default function TeamDetailsPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Team Members ({team.employees.length})
+                      {tr(lang, "teamDetail.members.title")} ({team.employees.length})
                     </CardTitle>
                     {team.employees.length > 0 && (
                       <Button 
@@ -251,7 +254,7 @@ export default function TeamDetailsPage() {
                         disabled={submitting}
                       >
                         <UserCog className="h-4 w-4 mr-1" /> 
-                        Change Team Lead
+                        {tr(lang, "teamDetail.members.changeLeader")}
                       </Button>
                     )}
                   </div>
@@ -260,13 +263,13 @@ export default function TeamDetailsPage() {
                   {team.employees.length === 0 ? (
                     <div className="text-center py-8">
                       <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium">No members assigned</h3>
+                      <h3 className="text-lg font-medium">{tr(lang, "teamDetail.members.empty.title")}</h3>
                       <p className="text-sm text-muted-foreground mb-4">
-                        Add team members to get started
+                        {tr(lang, "teamDetail.members.empty.description")}
                       </p>
                       <Button onClick={() => setIsAddMemberOpen(true)}>
                         <UserPlus className="h-4 w-4 mr-1" />
-                        Add First Member
+                        {tr(lang, "teamDetail.members.empty.addFirst")}
                       </Button>
                     </div>
                   ) : (
@@ -289,7 +292,7 @@ export default function TeamDetailsPage() {
                                 <span className="font-medium">{member.fullName}</span>
                                 {team.leaderId === member._id && (
                                   <Badge variant="default" className="text-xs">
-                                    <Crown className="h-3 w-3 mr-1" /> Team Lead
+                                    <Crown className="h-3 w-3 mr-1" /> {tr(lang, "teamDetail.members.teamLead")}
                                   </Badge>
                                 )}
                               </div>
@@ -314,7 +317,7 @@ export default function TeamDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Crown className="h-5 w-5 text-amber-500" />
-                    Team Lead
+                    {tr(lang, "teamDetail.teamLead.title")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -323,6 +326,7 @@ export default function TeamDetailsPage() {
                     fallbackName={team.employees.find(e => e._id === team.leaderId)?.fullName}
                     leaderId={team.leaderId}
                     employees={team.employees}
+                    lang={lang}
                   />
                 </CardContent>
               </Card>
@@ -332,7 +336,7 @@ export default function TeamDetailsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <MapPin className="h-5 w-5" />
-                    Coverage Areas
+                    {tr(lang, "teamDetail.coverage.title")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -364,10 +368,10 @@ export default function TeamDetailsPage() {
       <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
+            <DialogTitle>{tr(lang, "teamDetail.addMember.title")}</DialogTitle>
           </DialogHeader>
           {team && (
-            <AddMemberForm team={team} allStaff={allStaff} onAddMember={onAddMember} submitting={submitting} assignedStaffIds={assignedStaffIds} />
+            <AddMemberForm team={team} allStaff={allStaff} onAddMember={onAddMember} submitting={submitting} assignedStaffIds={assignedStaffIds} lang={lang} />
           )}
         </DialogContent>
       </Dialog>
@@ -377,10 +381,10 @@ export default function TeamDetailsPage() {
       <Dialog open={isChangeLeaderOpen} onOpenChange={setIsChangeLeaderOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Team Lead</DialogTitle>
+            <DialogTitle>{tr(lang, "teamDetail.changeLeader.title")}</DialogTitle>
           </DialogHeader>
           {team && (
-            <ChangeLeaderForm team={team} onSubmit={(tid, lid) => onSetLeader(lid)} submitting={submitting} />
+            <ChangeLeaderForm team={team} onSubmit={(tid, lid) => onSetLeader(lid)} submitting={submitting} lang={lang} />
           )}
         </DialogContent>
       </Dialog>
@@ -393,12 +397,14 @@ function TeamLeadDisplay({
   teamId, 
   fallbackName, 
   leaderId, 
-  employees 
+  employees,
+  lang
 }: { 
   teamId: string; 
   fallbackName?: string; 
   leaderId?: string;
   employees: User[];
+  lang: "en" | "hi" | "mr";
 }) {
   const { data, isLoading } = useSWR(["team-leader", teamId], async () => await getTeamLeader(teamId), { revalidateOnFocus: false });
   const name = data?.fullName || fallbackName;
@@ -425,7 +431,7 @@ function TeamLeadDisplay({
     return (
       <div className="text-center py-6">
         <Crown className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">No team lead assigned</p>
+        <p className="text-sm text-muted-foreground">{tr(lang, "teamDetail.teamLead.noLead")}</p>
       </div>
     );
   }
@@ -444,7 +450,7 @@ function TeamLeadDisplay({
         </div>
         <div className="text-sm text-muted-foreground flex items-center gap-1">
           <Mail className="h-3 w-3" />
-          {leadMember?.email || "Email not available"}
+          {leadMember?.email || tr(lang, "teamDetail.teamLead.emailNotAvailable")}
         </div>
       </div>
     </div>
@@ -497,7 +503,7 @@ function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffIds }: { team: Team; allStaff: User[]; onAddMember: (employeeId: string) => Promise<void>; submitting: boolean; assignedStaffIds: Set<string>; }) {
+function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffIds, lang }: { team: Team; allStaff: User[]; onAddMember: (employeeId: string) => Promise<void>; submitting: boolean; assignedStaffIds: Set<string>; lang: "en" | "hi" | "mr"; }) {
   const [selectedStaff, setSelectedStaff] = useState<string>("");
   const availableStaff = allStaff.filter(s => 
     s.role === "staff" && 
@@ -507,21 +513,21 @@ function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffI
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStaff) { toast.error("Please select a staff member"); return; }
+    if (!selectedStaff) { toast.error(tr(lang, "teamDetail.addMember.selectError")); return; }
     await onAddMember(selectedStaff);
   };
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label>Select Staff Member</Label>
+        <Label>{tr(lang, "teamDetail.addMember.selectLabel")}</Label>
         <Select value={selectedStaff} onValueChange={setSelectedStaff}>
           <SelectTrigger>
-            <SelectValue placeholder="Choose a staff member to add" />
+            <SelectValue placeholder={tr(lang, "teamDetail.addMember.placeholder")} />
           </SelectTrigger>
           <SelectContent>
             {availableStaff.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">No available staff members</div>
+              <div className="px-2 py-1.5 text-sm text-muted-foreground">{tr(lang, "teamDetail.addMember.noAvailable")}</div>
             ) : (
               availableStaff.map((staff) => (
                 <SelectItem key={staff._id} value={staff._id}>
@@ -534,10 +540,10 @@ function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffI
       </div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teamDetail.addMember.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={submitting || !selectedStaff || availableStaff.length === 0}>
-          {submitting ? "Adding..." : "Add Member"}
+          {submitting ? tr(lang, "teamDetail.addMember.adding") : tr(lang, "teamDetail.addMember.add")}
         </Button>
       </DialogFooter>
     </form>
@@ -545,20 +551,20 @@ function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffI
 }
 
 
-function ChangeLeaderForm({ team, onSubmit, submitting }: { team: Team; onSubmit: (teamId: string, leaderId: string) => Promise<void>; submitting: boolean; }) {
+function ChangeLeaderForm({ team, onSubmit, submitting, lang }: { team: Team; onSubmit: (teamId: string, leaderId: string) => Promise<void>; submitting: boolean; lang: "en" | "hi" | "mr"; }) {
   const [selectedLeader, setSelectedLeader] = useState(team.leaderId || "");
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLeader) { toast.error("Please select a team lead"); return; }
+    if (!selectedLeader) { toast.error(tr(lang, "teamDetail.changeLeader.selectError")); return; }
     await onSubmit(team._id, selectedLeader);
   };
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label>Select New Team Lead</Label>
+        <Label>{tr(lang, "teamDetail.changeLeader.selectLabel")}</Label>
         <Select value={selectedLeader} onValueChange={setSelectedLeader}>
           <SelectTrigger>
-            <SelectValue placeholder="Choose a team lead" />
+            <SelectValue placeholder={tr(lang, "teamDetail.changeLeader.placeholder")} />
           </SelectTrigger>
           <SelectContent>
             {team.employees.map((member) => (
@@ -566,19 +572,19 @@ function ChangeLeaderForm({ team, onSubmit, submitting }: { team: Team; onSubmit
                 <div className="flex items-center gap-2">
                   {team.leaderId === member._id && <Crown className="size-3 text-amber-500" />}
                   {member.fullName} ({member.email})
-                  {team.leaderId === member._id && <span className="text-xs text-muted-foreground">Current Team Lead</span>}
+                  {team.leaderId === member._id && <span className="text-xs text-muted-foreground">{tr(lang, "teamDetail.changeLeader.current")}</span>}
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-      <div className="text-sm text-muted-foreground">Current team lead: {team.employees.find(m => m._id === team.leaderId)?.fullName || "None"}</div>
+      <div className="text-sm text-muted-foreground">{tr(lang, "teamDetail.changeLeader.currentLabel")}: {team.employees.find(m => m._id === team.leaderId)?.fullName || tr(lang, "teamDetail.changeLeader.none")}</div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teamDetail.changeLeader.cancel")}</Button>
         </DialogClose>
-        <Button type="submit" disabled={submitting || !selectedLeader || selectedLeader === team.leaderId}>{submitting ? "Updating..." : "Change Team Lead"}</Button>
+        <Button type="submit" disabled={submitting || !selectedLeader || selectedLeader === team.leaderId}>{submitting ? tr(lang, "teamDetail.changeLeader.updating") : tr(lang, "teamDetail.changeLeader.change")}</Button>
       </DialogFooter>
     </form>
   );

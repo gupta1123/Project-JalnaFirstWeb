@@ -11,27 +11,28 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { tr } from "@/lib/i18n";
 
 export type NavItem = {
-  title: string;
+  titleKey: string;
   url: string;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   items?: Array<{ title: string; url: string }>; // not used yet
 };
 
-export function NavMain({ items }: { items: NavItem[] }) {
+export function NavMain({ items, lang }: { items: NavItem[]; lang: "en" | "hi" | "mr" }) {
   const pathname = usePathname();
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Main</SidebarGroupLabel>
+      <SidebarGroupLabel>{tr(lang, "sidebar.nav.main")}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
+            <SidebarMenuItem key={item.titleKey}>
               <SidebarMenuButton asChild isActive={pathname === item.url}>
                 <Link href={item.url}>
                   {item.icon ? <item.icon className="size-4" /> : null}
-                  <span>{item.title}</span>
+                  <span>{tr(lang, item.titleKey)}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

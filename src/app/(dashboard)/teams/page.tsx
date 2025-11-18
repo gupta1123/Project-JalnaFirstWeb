@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -38,7 +39,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { 
@@ -61,9 +61,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 
 export default function TeamsPage() {
+  const { lang } = useLanguage();
   const [search, setSearch] = useState("");
   // const [isViewOpen, setIsViewOpen] = useState<null | string>(null);
   const [isEditMemberOpen, setIsEditMemberOpen] = useState<null | {teamId: string, member: User}>(null);
@@ -104,10 +107,10 @@ export default function TeamsPage() {
     setSubmitting(true);
     try {
       await removeEmployeeFromTeam(teamId, employeeId);
-      toast.success("Member removed from team");
+      toast.success(tr(lang, "teams.toast.memberRemoved"));
       mutate();
     } catch (e) {
-      toast.error("Failed to remove member");
+      toast.error(tr(lang, "teams.toast.removeMemberFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -117,11 +120,11 @@ export default function TeamsPage() {
     setSubmitting(true);
     try {
       await updateTeamLeader(teamId, leaderId);
-      toast.success("Team lead updated");
+      toast.success(tr(lang, "teams.toast.teamLeadUpdated"));
       mutate();
       setIsChangeLeaderOpen(null);
     } catch (e) {
-      toast.error("Failed to update team lead");
+      toast.error(tr(lang, "teams.toast.updateTeamLeadFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -131,27 +134,27 @@ export default function TeamsPage() {
     setSubmitting(true);
     try {
       await updateStaff(memberId, updates);
-      toast.success("Staff member updated");
+      toast.success(tr(lang, "teams.toast.staffUpdated"));
       mutate();
       staffMutate();
       setIsEditMemberOpen(null);
     } catch (e) {
-      toast.error("Failed to update staff member");
+      toast.error(tr(lang, "teams.toast.updateStaffFailed"));
     } finally {
       setSubmitting(false);
     }
   };
 
   const onDeleteMember = async (teamId: string, memberId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove ${memberName} from this team?`)) return;
+    if (!confirm(`${tr(lang, "teams.confirm.removeMember")} ${memberName} ${tr(lang, "teams.confirm.removeMemberSuffix")}`)) return;
     
     setSubmitting(true);
     try {
       await removeEmployeeFromTeam(teamId, memberId);
-      toast.success("Member removed from team");
+      toast.success(tr(lang, "teams.toast.memberRemoved"));
       mutate();
     } catch (e) {
-      toast.error("Failed to remove team member");
+      toast.error(tr(lang, "teams.toast.removeTeamMemberFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -162,17 +165,17 @@ export default function TeamsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Teams Management</CardTitle>
+            <CardTitle>{tr(lang, "teams.title")}</CardTitle>
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Search teams..."
+                placeholder={tr(lang, "teams.searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-64"
               />
               <Button asChild>
                 <Link href="/teams/create">
-                  <Plus className="mr-2 size-4" /> New Team
+                  <Plus className="mr-2 size-4" /> {tr(lang, "teams.newTeam")}
                 </Link>
               </Button>
             </div>
@@ -183,11 +186,11 @@ export default function TeamsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[25%]">Team Name</TableHead>
-                  <TableHead className="w-[30%]">Description</TableHead>
-                  <TableHead className="w-[20%]">Area</TableHead>
-                  <TableHead className="w-[15%]">Members</TableHead>
-                  <TableHead className="w-[10%] text-right">Actions</TableHead>
+                  <TableHead className="w-[25%]">{tr(lang, "teams.table.teamName")}</TableHead>
+                  <TableHead className="w-[30%]">{tr(lang, "teams.table.description")}</TableHead>
+                  <TableHead className="w-[20%]">{tr(lang, "teams.table.area")}</TableHead>
+                  <TableHead className="w-[15%]">{tr(lang, "teams.table.members")}</TableHead>
+                  <TableHead className="w-[10%] text-right">{tr(lang, "teams.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,7 +209,7 @@ export default function TeamsPage() {
                 )}
                 {!isLoading && teams.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5}>No teams found</TableCell>
+                    <TableCell colSpan={5}>{tr(lang, "teams.empty.none")}</TableCell>
                   </TableRow>
                 )}
                 {teams.map((team: Team) => (
@@ -217,7 +220,7 @@ export default function TeamsPage() {
                         {team.leaderId && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Crown className="size-3" />
-                            Team lead: {team.employees.find(e => e._id === team.leaderId)?.fullName || 'Unknown'}
+                            {tr(lang, "teams.teamLead")}: {team.employees.find(e => e._id === team.leaderId)?.fullName || tr(lang, "teams.unknown")}
                           </div>
                         )}
                       </div>
@@ -253,7 +256,7 @@ export default function TeamsPage() {
                         <DropdownMenuContent align="end" className="w-48">
                           <Link href={`/teams/${team._id}`}>
                             <DropdownMenuItem>
-                              <Eye className="size-4" /> View Details
+                              <Eye className="size-4" /> {tr(lang, "teams.actions.viewDetails")}
                             </DropdownMenuItem>
                           </Link>
                         </DropdownMenuContent>
@@ -274,13 +277,14 @@ export default function TeamsPage() {
       <Dialog open={!!isEditMemberOpen} onOpenChange={(open) => !open && setIsEditMemberOpen(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogTitle>{tr(lang, "teams.editMember.title")}</DialogTitle>
           </DialogHeader>
           {isEditMemberOpen && (
             <EditMemberForm
               member={isEditMemberOpen.member}
               onSubmit={onEditMember}
               submitting={submitting}
+              lang={lang}
             />
           )}
         </DialogContent>
@@ -290,13 +294,14 @@ export default function TeamsPage() {
       <Dialog open={!!isChangeLeaderOpen} onOpenChange={(open) => !open && setIsChangeLeaderOpen(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Team Lead</DialogTitle>
+            <DialogTitle>{tr(lang, "teams.changeLeader.title")}</DialogTitle>
           </DialogHeader>
           {isChangeLeaderOpen && (
             <ChangeLeaderForm
               team={teamById.get(isChangeLeaderOpen)!}
               onSubmit={onSetLeader}
               submitting={submitting}
+              lang={lang}
             />
           )}
         </DialogContent>
@@ -438,11 +443,13 @@ function TeamLeadDisplay({ teamId, fallbackName }: { teamId: string; fallbackNam
 function EditMemberForm({ 
   member, 
   onSubmit, 
-  submitting 
+  submitting,
+  lang
 }: { 
   member: User;
   onSubmit: (memberId: string, updates: {firstName?: string, lastName?: string, email?: string, isActive?: boolean}) => Promise<void>;
   submitting: boolean;
+  lang: "en" | "hi" | "mr";
 }) {
   const [formData, setFormData] = useState({
     firstName: member.firstName,
@@ -454,7 +461,7 @@ function EditMemberForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim()) {
-      toast.error("Please fill all required fields");
+      toast.error(tr(lang, "teams.editMember.fillRequired"));
       return;
     }
     await onSubmit(member._id, formData);
@@ -464,7 +471,7 @@ function EditMemberForm({
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="grid gap-2">
-          <Label htmlFor="firstName">First Name *</Label>
+          <Label htmlFor="firstName">{tr(lang, "teams.editMember.firstName")} *</Label>
           <Input
             id="firstName"
             value={formData.firstName}
@@ -474,7 +481,7 @@ function EditMemberForm({
           />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="lastName">Last Name *</Label>
+          <Label htmlFor="lastName">{tr(lang, "teams.editMember.lastName")} *</Label>
           <Input
             id="lastName"
             value={formData.lastName}
@@ -486,7 +493,7 @@ function EditMemberForm({
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="email">Email *</Label>
+        <Label htmlFor="email">{tr(lang, "teams.editMember.email")} *</Label>
         <Input
           id="email"
           type="email"
@@ -506,16 +513,16 @@ function EditMemberForm({
           className="rounded border-gray-300"
         />
         <Label htmlFor="isActive" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Active staff member
+          {tr(lang, "teams.editMember.active")}
         </Label>
       </div>
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teams.editMember.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Updating..." : "Update Member"}
+          {submitting ? tr(lang, "teams.editMember.updating") : tr(lang, "teams.editMember.update")}
         </Button>
       </DialogFooter>
     </form>
@@ -526,18 +533,20 @@ function EditMemberForm({
 function ChangeLeaderForm({ 
   team, 
   onSubmit, 
-  submitting 
+  submitting,
+  lang
 }: { 
   team: Team;
   onSubmit: (teamId: string, leaderId: string) => Promise<void>;
   submitting: boolean;
+  lang: "en" | "hi" | "mr";
 }) {
   const [selectedLeader, setSelectedLeader] = useState(team.leaderId || "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLeader) {
-      toast.error("Please select a team lead");
+      toast.error(tr(lang, "teams.changeLeader.selectError"));
       return;
     }
     await onSubmit(team._id, selectedLeader);
@@ -546,10 +555,10 @@ function ChangeLeaderForm({
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label>Select New Team Lead</Label>
+        <Label>{tr(lang, "teams.changeLeader.select")}</Label>
         <Select value={selectedLeader} onValueChange={setSelectedLeader}>
           <SelectTrigger>
-            <SelectValue placeholder="Choose a team lead" />
+            <SelectValue placeholder={tr(lang, "teams.changeLeader.placeholder")} />
           </SelectTrigger>
           <SelectContent>
             {team.employees.map((member) => (
@@ -557,7 +566,7 @@ function ChangeLeaderForm({
                 <div className="flex items-center gap-2">
                   {team.leaderId === member._id && <Crown className="size-3 text-amber-500" />}
                   {member.fullName} ({member.email})
-                  {team.leaderId === member._id && <span className="text-xs text-muted-foreground">Current Team Lead</span>}
+                  {team.leaderId === member._id && <span className="text-xs text-muted-foreground">{tr(lang, "teams.changeLeader.current")}</span>}
                 </div>
               </SelectItem>
             ))}
@@ -566,15 +575,15 @@ function ChangeLeaderForm({
       </div>
 
       <div className="text-sm text-muted-foreground">
-        Current team lead: {team.employees.find(m => m._id === team.leaderId)?.fullName || "None"}
+        {tr(lang, "teams.changeLeader.currentLabel")}: {team.employees.find(m => m._id === team.leaderId)?.fullName || tr(lang, "teams.changeLeader.none")}
       </div>
 
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "teams.changeLeader.cancel")}</Button>
         </DialogClose>
         <Button type="submit" disabled={submitting || !selectedLeader || selectedLeader === team.leaderId}>
-          {submitting ? "Updating..." : "Change Team Lead"}
+          {submitting ? tr(lang, "teams.changeLeader.updating") : tr(lang, "teams.changeLeader.change")}
         </Button>
       </DialogFooter>
     </form>

@@ -10,21 +10,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { login, setAuthToken } from "@/lib/api";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
+import { Eye, EyeOff } from "lucide-react";
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter();
   const search = useSearchParams();
+  const { lang } = useLanguage();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
+  const [showPassword, setShowPassword] = React.useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
-      toast.error("Invalid inputs");
+      toast.error(tr(lang, "login.toast.invalidInputs"));
       return;
     }
     setLoading(true);
@@ -32,12 +37,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       const res = await login({ email, password });
       // For now, keep the token approach until backend supports httpOnly cookies
       setAuthToken(res.token);
-      toast.success("Login successful");
+      toast.success(tr(lang, "login.toast.success"));
       const next = search.get("next") ?? "/dashboard";
       router.replace(next);
     } catch (err: unknown) {
-      const anyErr = err as { response?: { data?: { message?: string } } };
-      toast.error(anyErr?.response?.data?.message ?? "Login failed");
+      const anyErr = err as { response?: { status?: number; data?: { message?: string } } };
+      if (anyErr?.response?.status === 401) {
+        toast.error(tr(lang, "login.toast.invalidPassword"));
+        return;
+      }
+      toast.error(anyErr?.response?.data?.message ?? tr(lang, "login.toast.error"));
     } finally {
       setLoading(false);
     }
@@ -50,19 +59,36 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
           <form className="p-8 md:p-10" onSubmit={onSubmit}>
             <div className="flex flex-col gap-6">
               <div className="flex flex-col items-center text-center">
-                <h1 className="text-2xl font-bold">Welcome back</h1>
-                <p className="text-muted-foreground text-balance">Login to your Jalna First admin</p>
+                <h1 className="text-2xl font-bold">{tr(lang, "login.heading")}</h1>
+                <p className="text-muted-foreground text-balance">{tr(lang, "login.subheading")}</p>
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Label htmlFor="email">{tr(lang, "login.labels.email")}</Label>
+                <Input id="email" type="email" placeholder={tr(lang, "login.placeholder.email")} required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="grid gap-3">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Label htmlFor="password">{tr(lang, "login.labels.password")}</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? tr(lang, "login.password.hide") : tr(lang, "login.password.show")}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Logging in..." : "Login"}
+                {loading ? tr(lang, "login.button.loading") : tr(lang, "login.button.submit")}
               </Button>
               {/* Social sign-in and sign-up removed */}
             </div>

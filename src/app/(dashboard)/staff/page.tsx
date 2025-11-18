@@ -47,8 +47,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function StaffPage() {
+  const { lang } = useLanguage();
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [search, setSearch] = useState("");
@@ -64,12 +67,12 @@ export default function StaffPage() {
 
 
   const onChangePassword = async (id: string, _newPwd: string) => {
-    toast.info("Change password API coming soon");
+    toast.info(tr(lang, "staff.changePassword.comingSoon"));
     setPwdTarget(null);
   };
 
   const onDeleteStaff = async (id: string) => {
-    toast.info("Delete staff API coming soon");
+    toast.info(tr(lang, "staff.delete.comingSoon"));
   };
 
   return (
@@ -77,17 +80,17 @@ export default function StaffPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Staff</CardTitle>
+            <CardTitle>{tr(lang, "staff.title")}</CardTitle>
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Search staff..."
+                placeholder={tr(lang, "staff.searchPlaceholder")}
                 value={search}
                 onChange={(e) => { setPage(1); setSearch(e.target.value); }}
                 className="w-64"
               />
               <Button asChild>
                 <Link href="/staff/create">
-                  <Plus className="mr-2 size-4" /> Create Staff
+                  <Plus className="mr-2 size-4" /> {tr(lang, "staff.create")}
                 </Link>
               </Button>
             </div>
@@ -98,12 +101,12 @@ export default function StaffPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Team</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-[120px] text-right">Actions</TableHead>
+                  <TableHead>{tr(lang, "staff.table.name")}</TableHead>
+                  <TableHead>{tr(lang, "staff.table.email")}</TableHead>
+                  <TableHead>{tr(lang, "staff.table.phone")}</TableHead>
+                  <TableHead>{tr(lang, "staff.table.team")}</TableHead>
+                  <TableHead>{tr(lang, "staff.table.status")}</TableHead>
+                  <TableHead className="w-[120px] text-right">{tr(lang, "staff.table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -123,7 +126,7 @@ export default function StaffPage() {
                 )}
                 {!isLoading && staff.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6}>No staff found</TableCell>
+                    <TableCell colSpan={6}>{tr(lang, "staff.empty.none")}</TableCell>
                   </TableRow>
                 )}
                 {staff.map((s) => (
@@ -139,7 +142,7 @@ export default function StaffPage() {
                               <span className="font-medium">{team.name}</span>
                               {team.isLeader && (
                                 <Badge variant="outline" className="ml-2 text-xs">
-                                  Leader
+                                  {tr(lang, "staff.badge.leader")}
                                 </Badge>
                               )}
                             </div>
@@ -150,7 +153,7 @@ export default function StaffPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? "Active" : "Inactive"}</Badge>
+                      <Badge variant={s.isActive ? "default" : "secondary"}>{s.isActive ? tr(lang, "staff.status.active") : tr(lang, "staff.status.inactive")}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -162,20 +165,20 @@ export default function StaffPage() {
                         <DropdownMenuContent align="end" className="w-44">
                           <Link href={`/staff/${s._id}`}>
                             <DropdownMenuItem>
-                              <Eye className="size-4" /> View
+                              <Eye className="size-4" /> {tr(lang, "staff.actions.view")}
                             </DropdownMenuItem>
                           </Link>
                           <Link href={`/staff/${s._id}/edit`}>
                             <DropdownMenuItem>
-                              <Edit className="size-4" /> Edit
+                              <Edit className="size-4" /> {tr(lang, "staff.actions.edit")}
                             </DropdownMenuItem>
                           </Link>
                           <DropdownMenuItem onClick={() => setPwdTarget(s)}>
-                            <KeyRound className="size-4" /> Change Password
+                            <KeyRound className="size-4" /> {tr(lang, "staff.actions.changePassword")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => onDeleteStaff(s._id)} className="text-red-600">
-                            <Trash2 className="size-4" /> Delete
+                            <Trash2 className="size-4" /> {tr(lang, "staff.actions.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -188,10 +191,10 @@ export default function StaffPage() {
 
           {pagination && (
             <div className="flex items-center justify-between text-sm">
-              <div>Page {pagination.currentPage} of {pagination.totalPages}</div>
+              <div>{tr(lang, "staff.pagination.page")} {pagination.currentPage} {tr(lang, "staff.pagination.of")} {pagination.totalPages}</div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pagination.currentPage <= 1}>Previous</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={pagination.currentPage >= pagination.totalPages}>Next</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pagination.currentPage <= 1}>{tr(lang, "staff.pagination.previous")}</Button>
+                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={pagination.currentPage >= pagination.totalPages}>{tr(lang, "staff.pagination.next")}</Button>
               </div>
             </div>
           )}
@@ -203,10 +206,10 @@ export default function StaffPage() {
       <Dialog open={!!pwdTarget} onOpenChange={(o) => !o && setPwdTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
+            <DialogTitle>{tr(lang, "staff.changePassword.title")}</DialogTitle>
           </DialogHeader>
           {pwdTarget && (
-            <ChangePasswordForm staff={pwdTarget} onSubmit={onChangePassword} submitting={submitting} />
+            <ChangePasswordForm staff={pwdTarget} onSubmit={onChangePassword} submitting={submitting} lang={lang} />
           )}
         </DialogContent>
       </Dialog>
@@ -214,24 +217,24 @@ export default function StaffPage() {
   );
 }
 
-function ChangePasswordForm({ staff, onSubmit, submitting }: { staff: User; onSubmit: (id: string, newPwd: string) => Promise<void>; submitting: boolean; }) {
+function ChangePasswordForm({ staff, onSubmit, submitting, lang }: { staff: User; onSubmit: (id: string, newPwd: string) => Promise<void>; submitting: boolean; lang: "en" | "hi" | "mr" }) {
   const [pwd, setPwd] = useState("");
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwd.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (pwd.length < 6) { toast.error(tr(lang, "staff.changePassword.error")); return; }
     await onSubmit(staff._id, pwd);
   };
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
-        <Label>New Password</Label>
-        <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Minimum 6 characters" />
+        <Label>{tr(lang, "staff.changePassword.newPassword")}</Label>
+        <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={tr(lang, "staff.changePassword.placeholder")} />
       </div>
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="secondary">Cancel</Button>
+          <Button type="button" variant="secondary">{tr(lang, "staff.changePassword.cancel")}</Button>
         </DialogClose>
-        <Button type="submit" disabled={submitting}>{submitting ? "Saving..." : "Save"}</Button>
+        <Button type="submit" disabled={submitting}>{submitting ? tr(lang, "staff.changePassword.saving") : tr(lang, "staff.changePassword.save")}</Button>
       </DialogFooter>
     </form>
   );

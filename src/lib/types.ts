@@ -40,6 +40,7 @@ export type User = {
   // Team information (from /api/users/me response)
   teams?: Array<{
     id: string;
+    _id?: string;
     name: string;
     leaderId?: string;
     isLeader: boolean;
@@ -134,7 +135,14 @@ export type TicketCategory =
   | "other";
 
 export type TicketPriority = "low" | "medium" | "high" | "urgent";
-export type TicketStatus = "open" | "in_progress" | "assigned" | "resolved" | "closed";
+export type TicketStatus =
+  | "open"
+  | "assigned"
+  | "in_progress"
+  | "pending_user"
+  | "pending_admin"
+  | "resolved"
+  | "closed";
 
 export type Ticket = {
   _id: string;
@@ -180,6 +188,15 @@ export type Ticket = {
     }>;
     isActive: boolean;
   }>;
+  // Single member owning the ticket (team-level workflow)
+  assignedUser?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: "user" | "admin" | "superadmin" | "staff";
+    isLeader?: boolean;
+  } | User | null;
   changeHistory?: Array<{
     _id: string;
     field?: string;
@@ -222,6 +239,44 @@ export type Team = {
   createdAt: string;
   updatedAt: string;
   __v?: number;
+};
+
+export type TicketStatusTotals = {
+  open: number;
+  assigned: number;
+  in_progress: number;
+  pending_user: number;
+  pending_admin: number;
+  resolved: number;
+  closed: number;
+  total: number;
+};
+
+export type TeamMemberStat = {
+  member: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    email?: string;
+    role?: string;
+    isLeader?: boolean;
+  };
+  stats: TicketStatusTotals;
+};
+
+export type TeamStatsResponse = {
+  team?: {
+    id: string;
+    name: string;
+    description?: string;
+  };
+  dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  teamTotals: TicketStatusTotals;
+  members: TeamMemberStat[];
 };
 
 // Category type

@@ -16,8 +16,11 @@ import { Eye, Lock, Shield } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 export default function UsersPage() {
+  const { lang } = useLanguage();
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [search, setSearch] = useState("");
@@ -48,7 +51,7 @@ export default function UsersPage() {
         setShowPasswordDialog(false);
       }
     } else {
-      toast.error("Incorrect password. Please try again.");
+      toast.error(tr(lang, "users.auth.incorrectPassword"));
       setPassword("");
     }
   };
@@ -76,24 +79,24 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Users Data Access Required
+              {tr(lang, "users.auth.required")}
             </DialogTitle>
             <DialogDescription>
               {passwordLevel === 1 
-                ? "Please enter the first level admin password to access user data."
-                : "Please enter the second level admin password to view user information."
+                ? tr(lang, "users.auth.level1Description")
+                : tr(lang, "users.auth.level2Description")
               }
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{tr(lang, "users.auth.password")}</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={`Enter level ${passwordLevel} password`}
+                placeholder={`${tr(lang, "users.auth.passwordPlaceholder")} ${passwordLevel} ${tr(lang, "users.auth.passwordPlaceholderSuffix")}`}
                 required
                 autoFocus
               />
@@ -105,11 +108,11 @@ export default function UsersPage() {
                 onClick={() => window.history.back()}
                 className="flex-1"
               >
-                Go Back
+                {tr(lang, "users.auth.goBack")}
               </Button>
               <Button type="submit" className="flex-1">
                 <Lock className="h-4 w-4 mr-2" />
-                {passwordLevel === 1 ? "Continue to Level 2" : "Access Users"}
+                {passwordLevel === 1 ? tr(lang, "users.auth.continueToLevel2") : tr(lang, "users.auth.accessUsers")}
               </Button>
             </div>
           </form>
@@ -118,14 +121,14 @@ export default function UsersPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle>Users Management</CardTitle>
+          <CardTitle>{tr(lang, "users.title")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {isAuthenticated ? (
             <>
               <div className="flex gap-2">
                 <Input 
-                  placeholder="Search name or email…" 
+                  placeholder={tr(lang, "users.searchPlaceholder")} 
                   value={search} 
                   onChange={(e) => { setPage(1); setSearch(e.target.value); }} 
                   className="max-w-sm"
@@ -135,12 +138,11 @@ export default function UsersPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-12 text-right">View</TableHead>
+                      <TableHead>{tr(lang, "users.table.name")}</TableHead>
+                      <TableHead>{tr(lang, "users.table.email")}</TableHead>
+                      <TableHead>{tr(lang, "users.table.phone")}</TableHead>
+                      <TableHead>{tr(lang, "users.table.status")}</TableHead>
+                      <TableHead className="w-12 text-right">{tr(lang, "users.table.view")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -151,7 +153,6 @@ export default function UsersPage() {
                             <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-56" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                             <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                             <TableCell className="text-right"><Skeleton className="h-8 w-8 rounded-md ml-auto" /></TableCell>
                           </TableRow>
@@ -160,7 +161,7 @@ export default function UsersPage() {
                     )}
                     {!isLoading && users.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6}>No users found</TableCell>
+                        <TableCell colSpan={5}>{tr(lang, "users.empty.none")}</TableCell>
                       </TableRow>
                     )}
                     {users.map((u: User) => (
@@ -169,11 +170,8 @@ export default function UsersPage() {
                         <TableCell>{u.email}</TableCell>
                         <TableCell>{u.phoneNumber || "-"}</TableCell>
                         <TableCell>
-                          <span className="capitalize">{u.role}</span>
-                        </TableCell>
-                        <TableCell>
                           <Badge variant={u.isActive ? "default" : "secondary"} className="text-xs">
-                            {u.isActive ? 'Active' : 'Inactive'}
+                            {u.isActive ? tr(lang, "users.status.active") : tr(lang, "users.status.inactive")}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
@@ -191,7 +189,7 @@ export default function UsersPage() {
               {pagination && (
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground text-center">
-                    Showing page {pagination.currentPage} of {pagination.totalPages} ({pagination.totalUsers} total users)
+                    {tr(lang, "users.pagination.showing")} {pagination.currentPage} {tr(lang, "users.pagination.of")} {pagination.totalPages} ({pagination.totalUsers} {tr(lang, "users.pagination.totalUsers")})
                   </div>
                   <Pagination className="pt-2">
                     <PaginationContent>
@@ -260,8 +258,8 @@ export default function UsersPage() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Please authenticate to view user data</p>
-              <p className="text-sm mt-2">You can navigate to other pages using the sidebar</p>
+              <p>{tr(lang, "users.auth.authenticateMessage")}</p>
+              <p className="text-sm mt-2">{tr(lang, "users.auth.sidebarMessage")}</p>
             </div>
           )}
         </CardContent>

@@ -10,23 +10,26 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { tr } from "@/lib/i18n";
 
 export function NavProjects({
   projects,
+  lang,
 }: {
-  projects: Array<{ name: string; url: string; icon?: React.ComponentType<React.SVGProps<SVGSVGElement>> }>;
+  projects: Array<{ nameKey: string; url: string; icon?: React.ComponentType<React.SVGProps<SVGSVGElement>> }>;
+  lang: "en" | "hi" | "mr";
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Operations</SidebarGroupLabel>
+      <SidebarGroupLabel>{tr(lang, "sidebar.nav.operations")}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {projects.map((item) => (
-            <SidebarMenuItem key={item.name}>
+            <SidebarMenuItem key={item.nameKey}>
               <SidebarMenuButton asChild>
                 <Link href={item.url}>
                   {item.icon ? <item.icon className="size-4" /> : null}
-                  <span>{item.name}</span>
+                  <span>{tr(lang, item.nameKey)}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

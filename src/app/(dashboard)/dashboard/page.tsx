@@ -11,11 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { api, adminGetTicketStats, getUserStats, getCurrentUser, getTeamTicketsMinimal } from '@/lib/api';
+import { useLanguage } from '@/components/LanguageProvider';
+import { tr } from '@/lib/i18n';
 // removed charts
 
 const fetcher = (url: string) => api.get(url).then((r) => r.data);
 
-type Greeting = { title: string; emoji: string; img: string } | null;
+type Greeting = { key: 'morning' | 'afternoon' | 'evening' | 'night'; emoji: string; img: string } | null;
 
 type Overview = {
   totalUsers: number;
@@ -44,12 +46,12 @@ function useGreeting(): Greeting {
       }).format(new Date())
     );
     if (hour >= 5 && hour < 11)
-      setGreeting({ title: 'Good morning', emoji: '🌅', img: pickHeaderImage('morning') });
+      setGreeting({ key: 'morning', emoji: '🌅', img: pickHeaderImage('morning') });
     else if (hour >= 11 && hour < 16)
-      setGreeting({ title: 'Good afternoon', emoji: '🌤️', img: pickHeaderImage('afternoon') });
+      setGreeting({ key: 'afternoon', emoji: '🌤️', img: pickHeaderImage('afternoon') });
     else if (hour >= 16 && hour < 21)
-      setGreeting({ title: 'Good evening', emoji: '🌙', img: pickHeaderImage('evening') });
-    else setGreeting({ title: 'Hello', emoji: '✨', img: pickHeaderImage('night') });
+      setGreeting({ key: 'evening', emoji: '🌙', img: pickHeaderImage('evening') });
+    else setGreeting({ key: 'night', emoji: '✨', img: pickHeaderImage('night') });
   }, []);
   return greeting;
 }
@@ -115,31 +117,33 @@ function useTicketStats(isAdmin: boolean) {
 }
 
 /* -------------------- Quote bank (curated) -------------------- */
-const QUOTES: string[] = [
-  'Serve simply. Solve steadily. Keep people first.',
-  'Clarity reduces chaos. Say what we will do and when.',
-  'Small resolved issues create big public trust.',
-  'Respect time: acknowledge, act, and update.',
-  'When unsure, verify at source—assumptions are expensive.',
-  'Consistency beats intensity. Close one loop at a time.',
-  'Document decisions so teams can move without you.',
-  'Urgency for people, patience for problems.',
-  'Measure what matters: response, resolution, and care.',
-  'If it’s promised, track it. If it’s tracked, keep it.',
-  'Ownership is visible: name, timestamp, next step.',
-  'Fewer clicks for citizens; fewer doubts for teams.',
-  'Progress over perfection. Ship a fix today.',
-  'Politeness costs nothing, and returns everything.',
-  'The best dashboard is a trustworthy update.',
-  'Data guides; field confirms.',
-  'Escalate early; surprises late help no one.',
-  'Align on outcome, then adjust the path.',
-  'Write to be understood on the first read.',
-  'Public service is a relay—handoff cleanly.',
-];
+const QUOTES = [
+  { key: 'serveSimply', fallback: 'Serve simply. Solve steadily. Keep people first.' },
+  { key: 'clarityReducesChaos', fallback: 'Clarity reduces chaos. Say what we will do and when.' },
+  { key: 'smallIssuesBigTrust', fallback: 'Small resolved issues create big public trust.' },
+  { key: 'respectTime', fallback: 'Respect time: acknowledge, act, and update.' },
+  { key: 'verifyAtSource', fallback: 'When unsure, verify at source—assumptions are expensive.' },
+  { key: 'consistencyBeatsIntensity', fallback: 'Consistency beats intensity. Close one loop at a time.' },
+  { key: 'documentDecisions', fallback: 'Document decisions so teams can move without you.' },
+  { key: 'urgencyVsPatience', fallback: 'Urgency for people, patience for problems.' },
+  { key: 'measureWhatMatters', fallback: 'Measure what matters: response, resolution, and care.' },
+  { key: 'trackPromises', fallback: 'If it’s promised, track it. If it’s tracked, keep it.' },
+  { key: 'visibleOwnership', fallback: 'Ownership is visible: name, timestamp, next step.' },
+  { key: 'fewerClicks', fallback: 'Fewer clicks for citizens; fewer doubts for teams.' },
+  { key: 'progressOverPerfection', fallback: 'Progress over perfection. Ship a fix today.' },
+  { key: 'politenessReturns', fallback: 'Politeness costs nothing, and returns everything.' },
+  { key: 'trustworthyDashboard', fallback: 'The best dashboard is a trustworthy update.' },
+  { key: 'dataGuides', fallback: 'Data guides; field confirms.' },
+  { key: 'escalateEarly', fallback: 'Escalate early; surprises late help no one.' },
+  { key: 'alignOutcome', fallback: 'Align on outcome, then adjust the path.' },
+  { key: 'writeClearly', fallback: 'Write to be understood on the first read.' },
+  { key: 'relayService', fallback: 'Public service is a relay—handoff cleanly.' },
+] as const;
 
-function useQuote(): string {
-  const [quote, setQuote] = useState<string>(QUOTES[0]);
+type QuoteEntry = (typeof QUOTES)[number];
+
+function useQuote(): QuoteEntry {
+  const [quote, setQuote] = useState<QuoteEntry>(QUOTES[0]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const key = 'ps_quote_pool_v2';
@@ -194,6 +198,7 @@ function pickHeaderImage(category: keyof typeof headerArt): string {
 
 /* -------------------- Page -------------------- */
 export default function DashboardPage() {
+  const { lang } = useLanguage();
   const { data: currentUser, isLoading: loadingUser } = useSWR('current-user', getCurrentUser);
   const user = currentUser as { firstName?: string; role?: string; teams?: Array<{ id: string; isLeader: boolean }> } | undefined;
   const userRole = user?.role || 'user';
@@ -233,7 +238,9 @@ export default function DashboardPage() {
                 {loadingUser || !greeting ? (
                   <Skeleton className="h-7 w-64" />
                 ) : (
-                  `${greeting.title}, ${user?.firstName ?? 'there'}! ${greeting.emoji}`
+                  `${tr(lang, 'dashboard.greeting.' + greeting.key)}, ${
+                    user?.firstName ?? tr(lang, 'dashboard.greeting.there')
+                  }! ${greeting.emoji}`
                 )}
               </div>
 
@@ -243,22 +250,24 @@ export default function DashboardPage() {
                 </Badge>
               </div>
 
-              <p className="opacity-90 text-sm leading-relaxed max-w-prose">{quote}</p>
+              <p className="opacity-90 text-sm leading-relaxed max-w-prose">
+                {tr(lang, `dashboard.quotes.${quote.key}`) ?? quote.fallback}
+              </p>
 
               <div className="flex flex-wrap gap-2 pt-1">
                 {isAdmin && (
                   <Button size="sm" variant="secondary" asChild>
-                    <Link href="/complaints">View Open Complaints</Link>
+                    <Link href="/complaints">{tr(lang, 'dashboard.hero.viewOpenComplaints')}</Link>
                   </Button>
                 )}
                 {isStaff && (
                   <Button size="sm" variant="secondary" asChild>
-                    <Link href="/my-tickets">View My Tickets</Link>
+                    <Link href="/my-tickets">{tr(lang, 'dashboard.hero.viewMyTickets')}</Link>
                   </Button>
                 )}
                 {isAdmin && (
                   <Button size="sm" variant="ghost" className="text-inherit" asChild>
-                    <Link href="/agency-contacts">Agency Contacts</Link>
+                    <Link href="/agency-contacts">{tr(lang, 'dashboard.hero.agencyContacts')}</Link>
                   </Button>
                 )}
               </div>
@@ -282,7 +291,7 @@ export default function DashboardPage() {
       <Card className="h-full">
         <CardHeader className="pb-2">
           <CardTitle>
-            {isAdmin ? 'Complaints snapshot' : 'My Tickets'}
+            {isAdmin ? tr(lang, 'dashboard.snapshot.admin.title') : tr(lang, 'dashboard.snapshot.staff.title')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 flex-1">
@@ -298,12 +307,14 @@ export default function DashboardPage() {
           </div>
           ) : (
             <>
-              <RowStat label="Total" value={rawTicketStats?.overall?.total ?? 0} badgeVariant="secondary" />
-              <RowStat label="Open" value={ticketCounts.open} badgeVariant="default" />
-              <RowStat label="In progress" value={ticketCounts.inProgress} badgeVariant="secondary" />
-              <RowStat label="Resolved" value={ticketCounts.resolved} badgeVariant="outline" />
-              <RowStat label="Closed" value={ticketCounts.closed} badgeVariant="outline" />
-              <div className="pt-1 text-xs text-muted-foreground">High priority: {rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0}</div>
+              <RowStat label={tr(lang, 'dashboard.snapshot.admin.total')} value={rawTicketStats?.overall?.total ?? 0} badgeVariant="secondary" />
+              <RowStat label={tr(lang, 'dashboard.snapshot.admin.open')} value={ticketCounts.open} badgeVariant="default" />
+              <RowStat label={tr(lang, 'dashboard.snapshot.admin.inProgress')} value={ticketCounts.inProgress} badgeVariant="secondary" />
+              <RowStat label={tr(lang, 'dashboard.snapshot.admin.resolved')} value={ticketCounts.resolved} badgeVariant="outline" />
+              <RowStat label={tr(lang, 'dashboard.snapshot.admin.closed')} value={ticketCounts.closed} badgeVariant="outline" />
+              <div className="pt-1 text-xs text-muted-foreground">
+                {tr(lang, 'dashboard.snapshot.admin.highPriority')}: {rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0}
+              </div>
             </>
           ))}
           
@@ -320,26 +331,26 @@ export default function DashboardPage() {
             <>
               {teamTickets?.tickets ? (
                 <>
-                  <RowStat label="Total Assigned" value={teamTickets.tickets.length} badgeVariant="secondary" />
+                  <RowStat label={tr(lang, 'dashboard.snapshot.staff.totalAssigned')} value={teamTickets.tickets.length} badgeVariant="secondary" />
                   <RowStat 
-                    label="Open" 
+                    label={tr(lang, 'dashboard.snapshot.staff.open')} 
                     value={teamTickets.tickets.filter(t => t.status === 'open').length} 
                     badgeVariant="default" 
                   />
                   <RowStat 
-                    label="In Progress" 
+                    label={tr(lang, 'dashboard.snapshot.staff.inProgress')} 
                     value={teamTickets.tickets.filter(t => t.status === 'in_progress').length} 
                     badgeVariant="secondary" 
                   />
                   <RowStat 
-                    label="Completed" 
+                    label={tr(lang, 'dashboard.snapshot.staff.completed')} 
                     value={teamTickets.tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length} 
                     badgeVariant="outline" 
                   />
                 </>
               ) : (
-                <div className="text-center py-4">
-                  <span className="text-sm text-muted-foreground">No tickets assigned</span>
+                <div className="text-center py-4 text-sm text-muted-foreground">
+                  {tr(lang, 'dashboard.snapshot.staff.empty')}
                 </div>
               )}
             </>
@@ -350,36 +361,41 @@ export default function DashboardPage() {
       {/* Role-based KPI STRIP */}
       {isAdmin && (
         <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
-          <StatsTile label="Total users" value={overview?.totalUsers} loading={loadingOverview} />
-          <StatsTile label="New this week" value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
-          <StatsTile label="Open complaints" value={ticketCounts.open} loading={loadingTickets} />
-          <StatsTile label="High priority" value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
+          <StatsTile label={tr(lang, 'dashboard.kpi.admin.totalUsers')} value={overview?.totalUsers} loading={loadingOverview} />
+          <StatsTile label={tr(lang, 'dashboard.kpi.admin.newThisWeek')} value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
+          <StatsTile label={tr(lang, 'dashboard.kpi.admin.openComplaints')} value={ticketCounts.open} loading={loadingTickets} />
+          <StatsTile label={tr(lang, 'dashboard.kpi.admin.highPriority')} value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
         </div>
       )}
       
       {isStaff && teamTickets && (
-        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
-          <StatsTile 
-            label="My Tickets" 
-            value={teamTickets.tickets.length} 
-            loading={loadingTeamTickets} 
+        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-4">
+          <StatsTile
+            label={tr(lang, 'dashboard.kpi.staff.myTickets')}
+            value={teamTickets.tickets.length}
+            loading={loadingTeamTickets}
           />
-          <StatsTile 
-            label="Open" 
-            value={teamTickets.tickets.filter(t => t.status === 'open').length} 
-            loading={loadingTeamTickets} 
-            tone="alt" 
+          <StatsTile
+            label={tr(lang, 'dashboard.kpi.staff.open')}
+            value={teamTickets.tickets.filter(t => t.status === 'open').length}
+            loading={loadingTeamTickets}
+            tone="alt"
           />
-          <StatsTile 
-            label="In Progress" 
-            value={teamTickets.tickets.filter(t => t.status === 'in_progress').length} 
-            loading={loadingTeamTickets} 
+          <StatsTile
+            label={tr(lang, 'dashboard.kpi.staff.assigned')}
+            value={teamTickets.tickets.filter(t => t.status === 'assigned').length}
+            loading={loadingTeamTickets}
           />
-          <StatsTile 
-            label="Completed" 
-            value={teamTickets.tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length} 
-            loading={loadingTeamTickets} 
-            tone="alt" 
+          <StatsTile
+            label={tr(lang, 'dashboard.kpi.staff.inProgress')}
+            value={teamTickets.tickets.filter(t => t.status === 'in_progress').length}
+            loading={loadingTeamTickets}
+          />
+          <StatsTile
+            label={tr(lang, 'dashboard.kpi.staff.completed')}
+            value={teamTickets.tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length}
+            loading={loadingTeamTickets}
+            tone="alt"
           />
         </div>
       )}
@@ -390,16 +406,16 @@ export default function DashboardPage() {
       <div className="xl:col-span-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {isAdmin && (
           <>
-            <GradientMini title="Check complaints" href="/complaints" />
-            <GradientMini title="Manage teams" href="/teams" variant="alt" />
-            <GradientMini title="Browse contacts" href="/agency-contacts" variant="alt" />
-            <GradientMini title="View reports" variant="alt" disabled />
+            <GradientMini title={tr(lang, 'dashboard.quick.admin.checkComplaints')} href="/complaints" />
+            <GradientMini title={tr(lang, 'dashboard.quick.admin.manageTeams')} href="/teams" variant="alt" />
+            <GradientMini title={tr(lang, 'dashboard.quick.admin.browseContacts')} href="/agency-contacts" variant="alt" />
+            <GradientMini title={tr(lang, 'dashboard.quick.admin.viewReports')} variant="alt" disabled />
           </>
         )}
         {isStaff && (
           <>
-            <GradientMini title="My tickets" href="/my-tickets" />
-            {isTeamLead && <GradientMini title="Team members" href="/team-members" variant="alt" />}
+            <GradientMini title={tr(lang, 'dashboard.quick.staff.myTickets')} href="/my-tickets" />
+            {isTeamLead && <GradientMini title={tr(lang, 'dashboard.quick.staff.teamMembers')} href="/team-members" variant="alt" />}
           </>
         )}
       </div>

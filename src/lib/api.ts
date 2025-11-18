@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Cookies from "js-cookie";
-import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory } from "./types";
+import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory, TeamStatsResponse } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jalnafirst-d1c348495722.herokuapp.com";
 
@@ -61,6 +61,13 @@ export type RegisterPayload = {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  // Optional location coordinates during registration (docs #7)
+  location?: {
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
 };
 export async function register(payload: RegisterPayload) {
   const res = await api.post("/api/auth/register", payload);
@@ -518,6 +525,13 @@ export async function assignTeamsToTicket(ticketId: string, teamIds: string[], m
 export async function getTeamTicketsMinimal(params?: {
   page?: number;
   limit?: number;
+  status?: string;
+  zone?: string;
+  city?: string;
+  state?: string;
+  search?: string;
+  category?: string; // id or name
+  subCategory?: string; // id or name
 }) {
   const res = await api.get("/api/tickets/team/minimal", { params });
   return res.data as {
@@ -529,6 +543,36 @@ export async function getTeamTicketsMinimal(params?: {
       attachments: unknown[];
       status: string;
       createdAt: string;
+      assignedUser?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        role: string;
+      } | null;
+      assignedTo?: {
+        id: string;
+        name: string;
+      } | null;
+      category?: {
+        id: string;
+        name: string;
+        description?: string;
+        isActive?: boolean;
+      } | null;
+      subCategory?: {
+        id: string;
+        name: string;
+        description?: string;
+        isActive?: boolean;
+      } | null;
+      assignedTeams?: Array<{
+        id: string;
+        name: string;
+        isActive: boolean;
+      }>;
+      adminNotes?: unknown[];
+      changeHistory?: unknown[];
     }>;
     pagination: {
       currentPage: number;
@@ -538,19 +582,41 @@ export async function getTeamTicketsMinimal(params?: {
   };
 }
 
-// Get a specific team ticket by ID from the team tickets list
+// Get a specific team ticket by ID using the team minimal feed.
+// We iterate through pages so that:
+// - Team leaders can open ANY ticket for their teams
+// - Staff can open only tickets they are allowed to see
+// - We still rely on the team-minimal shape (which includes status, assignedUser, etc.)
 export async function getTeamTicketById(ticketId: string) {
-  const res = await api.get("/api/tickets/team/minimal");
-  const tickets = res.data.tickets as Array<{
-    id: string;
-    description: string;
-    coordinates?: { latitude: number; longitude: number };
-    attachments: unknown[];
-    status: string;
-    createdAt: string;
-  }>;
-  const ticket = tickets.find(t => t.id === ticketId);
-  return ticket ? { ticket } : null;
+  const pageSize = 50;
+  let page = 1;
+
+  // Loop through pages until we either find the ticket or exhaust all pages.
+  // This avoids relying on the first page only (which caused some tickets
+  // to appear as "not found" or with missing data).
+  // The backend enforces access control on /tickets/team/minimal, so we
+  // still respect visibility rules for staff vs. leaders.
+  // NOTE: We intentionally do NOT add extra filters here so we don't
+  // accidentally exclude the ticket.
+  while (true) {
+    const { tickets, pagination } = await getTeamTicketsMinimal({
+      page,
+      limit: pageSize,
+    });
+
+    const ticket = tickets.find((t) => t.id === ticketId);
+    if (ticket) {
+      return { ticket };
+    }
+
+    if (!pagination || page >= pagination.totalPages) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return null;
 }
 
 export async function markTicketComplete(ticketId: string) {
@@ -638,6 +704,67 @@ export type TicketStats = {
 export async function adminGetTicketStats(): Promise<TicketStats> {
   const res = await api.get("/api/tickets/admin/stats");
   return res.data as TicketStats;
+}
+
+// Assign a specific staff/leader to a ticket (team endpoint)
+export async function assignTicketMember(ticketId: string, userId: string) {
+  const res = await api.put(`/api/tickets/team/${ticketId}/assign-member`, { userId });
+  return res.data as {
+    message: string;
+    assignedUser: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: string;
+    };
+  };
+}
+
+// Bulk member assignment for multiple tickets (team endpoint)
+export async function bulkAssignTicketMember(ticketIds: string[], userId: string) {
+  const res = await api.post(`/api/tickets/team/bulk-assign-member`, { ticketIds, userId });
+  return res.data as {
+    message: string;
+    total: number;
+    successful: number;
+    failed: number;
+    results: Array<{
+      ticketId: string;
+      success: boolean;
+      assignedUser?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        role: string;
+      };
+    }>;
+    errors?: Array<{ ticketId: string; error: string }>;
+  };
+}
+
+// Team & Admin stats (docs #6)
+export async function getTeamStats(
+  teamId: string,
+  params?: { startDate?: string; endDate?: string }
+): Promise<TeamStatsResponse> {
+  const res = await api.get(`/api/teams/${teamId}/stats`, {
+    params: {
+      ...(params?.startDate ? { startDate: params.startDate } : {}),
+      ...(params?.endDate ? { endDate: params.endDate } : {}),
+    },
+  });
+  return res.data as TeamStatsResponse;
+}
+
+export async function getAdminTeamStats(params?: {
+  startDate?: string;
+  endDate?: string;
+  teamId?: string;
+}) {
+  const res = await api.get("/api/admin/team-stats", { params });
+  return res.data as unknown;
 }
 
 // Categories API

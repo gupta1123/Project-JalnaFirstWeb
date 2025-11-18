@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { LayoutDashboard, Users, FileWarning, Megaphone, UsersRound, Ticket, UserCheck, Tags } from "lucide-react";
+import { LayoutDashboard, Users, FileWarning, Megaphone, UsersRound, Ticket, UserCheck, Tags, BarChart3 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import useSWR from "swr";
@@ -9,6 +9,8 @@ import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
 import { UserMenu } from "@/components/UserMenu";
 import { getCurrentUser } from "@/lib/api";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 import {
   Sidebar,
   SidebarContent,
@@ -30,24 +32,30 @@ const getNavigationData = (userRole: string, isTeamLead: boolean = false) => {
       email: "user@example.com",
     },
     navMain: [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-      ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
-      ...(isAdmin ? [{ title: "Staff", url: "/staff", icon: UsersRound }] : []),
+      { titleKey: "sidebar.nav.dashboard", url: "/dashboard", icon: LayoutDashboard },
+      ...(isAdmin ? [{ titleKey: "sidebar.nav.users", url: "/users", icon: Users }] : []),
+      ...(isAdmin ? [{ titleKey: "sidebar.nav.staff", url: "/staff", icon: UsersRound }] : []),
     ],
     navSecondary: [],
     projects: [
-      ...(isAdmin ? [{ name: "Complaints", url: "/complaints", icon: FileWarning }] : []),
-      ...(isStaff ? [{ name: "My Tickets", url: "/my-tickets", icon: Ticket }] : []),
-      ...(isAdmin ? [{ name: "Agency Contacts", url: "/agency-contacts", icon: Megaphone }] : []),
-      ...(isAdmin ? [{ name: "Teams", url: "/teams", icon: UsersRound }] : []),
+      ...(isAdmin ? [{ nameKey: "sidebar.nav.complaints", url: "/complaints", icon: FileWarning }] : []),
+      ...(isStaff ? [{ nameKey: "sidebar.nav.teamTickets", url: "/my-tickets", icon: Ticket }] : []),
+      ...(isAdmin ? [{ nameKey: "sidebar.nav.agencyContacts", url: "/agency-contacts", icon: Megaphone }] : []),
+      ...(isAdmin ? [{ nameKey: "sidebar.nav.teams", url: "/teams", icon: UsersRound }] : []),
       // ...(isAdmin ? [{ name: "Categories", url: "/admin-categories", icon: Tags }] : []), // Hidden from sidebar
-      ...(isTeamLead ? [{ name: "Team Members", url: "/team-members", icon: UserCheck }] : []),
+      ...(isTeamLead
+        ? [
+            { nameKey: "sidebar.nav.teamMembers", url: "/team-members", icon: UserCheck },
+            { nameKey: "sidebar.nav.reports", url: "/reports", icon: BarChart3 },
+          ]
+        : []),
       // ...(isTeamLead ? [{ name: "Categories", url: "/categories", icon: Tags }] : []), // Hidden from sidebar
     ],
   };
 };
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const { lang } = useLanguage();
   // Fetch current user to determine role
   const { data: currentUser, isLoading } = useSWR("current-user", getCurrentUser, {
     revalidateOnFocus: false,
@@ -61,7 +69,13 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
 
   // Determine panel title based on role
-  const panelTitle = userRole === "staff" ? (isTeamLead ? "Team Lead Panel" : "Staff Panel") : "Admin Panel";
+  const panelTitleKey =
+    userRole === "staff"
+      ? isTeamLead
+        ? "sidebar.panel.teamLead"
+        : "sidebar.panel.staff"
+      : "sidebar.panel.admin";
+  const panelTitle = tr(lang, panelTitleKey);
 
   return (
     <Sidebar {...props}>
@@ -85,8 +99,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         {!isLoading && (
           <>
-            <NavMain items={navigationData.navMain} />
-            <NavProjects projects={navigationData.projects} />
+            <NavMain items={navigationData.navMain} lang={lang} />
+            <NavProjects projects={navigationData.projects} lang={lang} />
           </>
         )}
       </SidebarContent>

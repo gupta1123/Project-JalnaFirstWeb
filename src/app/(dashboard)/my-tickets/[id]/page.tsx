@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   MapPin,
@@ -33,50 +34,66 @@ import {
   Image,
   Video,
   File,
-  Play
+  Play,
+  X
 } from "lucide-react";
-import { api, updateTicketStatusTeam, getTicketAttachments, getTeamTicketById, adminGetTicketHistory, adminAddNote } from "@/lib/api";
+import {
+  api,
+  updateTicketStatusTeam,
+  getTicketAttachments,
+  getTeamTicketById,
+  adminGetTicketHistory,
+  adminAddNote,
+  assignTeamsToTicket,
+  getMyTeam,
+  uploadTicketAttachments,
+  getCurrentUser,
+  assignTicketMember,
+  getTeamById,
+} from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { Ticket, User, ChangedBy } from "@/lib/types";
+import { useLanguage } from "@/components/LanguageProvider";
+import { tr } from "@/lib/i18n";
 
 // Fetcher function for SWR
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // Helper function to format role display
-const formatUserRole = (user: ChangedBy | User) => {
+const formatUserRole = (user: ChangedBy | User, lang: "en" | "hi" | "mr") => {
   if (!user) return '';
 
   // Check for admin role
   if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
-    return 'Admin';
+    return tr(lang, "ticketDetail.role.admin");
   }
 
   // Check for team leader (staff with isTeamLeader: true)
   if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
-    return 'Team Lead';
+    return tr(lang, "ticketDetail.role.teamLead");
   }
 
   // Check for staff
   if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
-    return 'Staff';
+    return tr(lang, "ticketDetail.role.staff");
   }
 
   // Check for team leader display role
   if ('displayRole' in user && user.displayRole === 'team_leader') {
-    return 'Team Lead';
+    return tr(lang, "ticketDetail.role.teamLead");
   }
 
   return '';
 };
 
 // Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | ChangedBy) => {
-  if (!changedBy) return 'Unknown User';
+const formatChangedBy = (changedBy: string | User | ChangedBy, lang: "en" | "hi" | "mr") => {
+  if (!changedBy) return tr(lang, "ticketDetail.unknownUser");
 
   if (typeof changedBy === 'string') return changedBy;
 
   // Handle User type with role information
-  const userRole = formatUserRole(changedBy);
+  const userRole = formatUserRole(changedBy, lang);
   const userName = changedBy.fullName ||
     (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
     changedBy.email ||
@@ -89,7 +106,7 @@ const formatChangedBy = (changedBy: string | User | ChangedBy) => {
   // Fallback to name only if available
   if (userName) return userName;
 
-  return 'Unknown User';
+  return tr(lang, "ticketDetail.unknownUser");
 };
 
 // Status badge helper function
@@ -126,11 +143,20 @@ interface StaffTicketDetailPageProps {
 }
 
 export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageProps) {
+  const { lang } = useLanguage();
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [resolutionNote, setResolutionNote] = useState("");
   const [activeSubTab, setActiveSubTab] = useState("activity");
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofFileName, setProofFileName] = useState<string>("");
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [proofInputKey, setProofInputKey] = useState(0);
+  const [assignMemberOpen, setAssignMemberOpen] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [assigningMember, setAssigningMember] = useState(false);
   
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<{
@@ -153,11 +179,32 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     { revalidateOnFocus: false }
   );
 
-  const { data: attachmentsData, isLoading: loadingAttachments } = useSWR(
+  const {
+    data: attachmentsData,
+    isLoading: loadingAttachments,
+    mutate: mutateAttachments,
+  } = useSWR(
     `attachments-${id}`,
     () => getTicketAttachments(id),
     { revalidateOnFocus: false }
   );
+
+  const { data: myTeamData } = useSWR("my-team", () => getMyTeam(), { revalidateOnFocus: false });
+  const { data: currentUser } = useSWR("current-user", getCurrentUser, {
+    revalidateOnFocus: false,
+  });
+  const isTeamLead = currentUser?.teams?.some((t) => t.isLeader) ?? false;
+  const leaderTeamId =
+    currentUser?.teams?.find((t) => t.isLeader)?.id ?? currentUser?.teams?.[0]?.id;
+
+  const { data: teamDetails } = useSWR(
+    isTeamLead && leaderTeamId ? ["team-details", leaderTeamId] : null,
+    () => getTeamById(leaderTeamId!),
+    { revalidateOnFocus: false }
+  );
+
+  const teamMembers =
+    teamDetails?.employees?.filter((member) => member._id !== teamDetails?.leaderId) ?? [];
 
   // Ticket History
   type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: string; changedAt?: string };
@@ -180,6 +227,27 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const ticket = data?.ticket as Ticket | undefined;
   const attachments = attachmentsData?.attachments || [];
   const isClosed = !!ticket && ticket.status === 'closed';
+  const assignedTeamCount = ticket?.assignedTeams?.length ?? 0;
+  const primaryTeam = myTeamData?.team || myTeamData?.teams?.[0];
+  const primaryTeamId = (primaryTeam as { _id?: string; id?: string } | undefined)?._id || (primaryTeam as { _id?: string; id?: string } | undefined)?.id;
+  const currentUserId =
+    (currentUser as User | undefined)?.id || (currentUser as User | undefined)?._id;
+
+  const isAssignedUser =
+    !!ticket &&
+    !!currentUserId &&
+    !!ticket.assignedUser &&
+    ((ticket.assignedUser as User)._id === currentUserId ||
+      (ticket.assignedUser as { id?: string }).id === currentUserId);
+
+  const isLeaderForTicketTeam =
+    !!primaryTeamId &&
+    !!ticket?.assignedTeams?.some(
+      (t) => (t as { _id?: string; id?: string })._id === primaryTeamId || (t as { _id?: string; id?: string }).id === primaryTeamId
+    );
+
+  const canUpdateStatus = !!ticket && (isAssignedUser || isLeaderForTicketTeam);
+  const canAssignMember = !!ticket && !ticket.assignedUser && isTeamLead;
 
 
   const handleStartWork = async () => {
@@ -188,14 +256,14 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     try {
       setUpdatingStatus(true);
       await updateTicketStatusTeam(id, {
-        status: "in_progress"
+        status: "in_progress",
       });
-      toast.success("Work started successfully");
-      mutate(); // Refresh the ticket data
+      toast.success(tr(lang, "ticketDetail.workStartedSuccessfully"));
+      mutate(); 
     } catch (error: unknown) {
       console.error("Failed to start work:", error);
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to start work"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || tr(lang, "ticketDetail.failedToStartWork")
       );
     } finally {
       setUpdatingStatus(false);
@@ -205,37 +273,96 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const handleMarkResolved = async () => {
     if (!ticket) return;
 
+    if (!proofFile) {
+      toast.error(tr(lang, "ticketDetail.pleaseUploadPhoto"));
+      return;
+    }
+
     try {
       setUpdatingStatus(true);
+      // 1) Upload proof attachment (image only)
+      await uploadTicketAttachments(id, [proofFile], "add");
+
+      // 2) Update status to resolved
       await updateTicketStatusTeam(id, {
-        status: "resolved"
+        status: "resolved",
       });
-      toast.success("Ticket marked as resolved");
+
+      toast.success(tr(lang, "ticketDetail.ticketMarkedResolved"));
       mutate(); // Refresh the ticket data
+      mutateAttachments(); // Refresh attachments list
       setResolutionNote("");
+      setProofFile(null);
+      setProofFileName("");
+      if (proofPreviewUrl) {
+        URL.revokeObjectURL(proofPreviewUrl);
+        setProofPreviewUrl(null);
+      }
     } catch (error: unknown) {
       console.error("Failed to mark as resolved:", error);
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark as resolved"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || tr(lang, "ticketDetail.failedToMarkResolved")
       );
     } finally {
       setUpdatingStatus(false);
     }
   };
 
+  const handleAssignToMyTeam = async () => {
+    if (!ticket || !primaryTeamId) return;
+    try {
+      setAssigning(true);
+      await assignTeamsToTicket(ticket._id || id, [primaryTeamId], "replace");
+      toast.success(`${tr(lang, "ticketDetail.ticketAssignedToTeam")} ${primaryTeam?.name ?? tr(lang, "ticketDetail.yourTeam")}`);
+      mutate();
+    } catch (error: unknown) {
+      console.error("Failed to assign team:", error);
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || tr(lang, "ticketDetail.failedToAssignTeam")
+      );
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleAssignMember = async () => {
+    if (!ticket) return;
+    if (!selectedMemberId) {
+      toast.error(tr(lang, "teamTickets.assignMember.selectError"));
+      return;
+    }
+    setAssigningMember(true);
+    try {
+      await assignTicketMember(ticket._id || id, selectedMemberId);
+      toast.success(tr(lang, "teamTickets.assignMember.success"));
+      setAssignMemberOpen(false);
+      setSelectedMemberId("");
+      mutate();
+    } catch (error: unknown) {
+      console.error("Failed to assign member:", error);
+      toast.error(
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          tr(lang, "teamTickets.assignMember.error")
+      );
+    } finally {
+      setAssigningMember(false);
+    }
+  };
+
   const handleAddNote = async () => {
     if (!newNote.trim() || !ticket) return;
+    
     
     try {
       setAddingNote(true);
       await adminAddNote(id, newNote.trim());
-      toast.success("Note added successfully");
+      toast.success(tr(lang, "ticketDetail.noteAddedSuccessfully"));
       mutate(); // Refresh the ticket data to get updated notes
       setNewNote("");
     } catch (error: unknown) {
       console.error("Failed to add note:", error);
       toast.error(
-        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to add note"
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || tr(lang, "ticketDetail.failedToAddNote")
       );
     } finally {
       setAddingNote(false);
@@ -257,16 +384,16 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           <Button variant="ghost" size="sm" asChild>
             <Link href="/my-tickets">
               <ArrowLeft className="size-4 mr-2" />
-              Back to My Tickets
+              {tr(lang, "ticketDetail.backToTickets")}
             </Link>
           </Button>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="size-12 text-red-500 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Ticket Not Found</h2>
+            <h2 className="text-xl font-semibold mb-2">{tr(lang, "ticketDetail.ticketNotFound")}</h2>
             <p className="text-muted-foreground text-center">
-              This ticket doesn&apos;t exist or you don&apos;t have permission to view it.
+              {tr(lang, "ticketDetail.ticketNotFoundDescription")}
             </p>
           </CardContent>
         </Card>
@@ -281,7 +408,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           <Button variant="ghost" size="sm" asChild>
             <Link href="/my-tickets">
               <ArrowLeft className="size-4 mr-2" />
-              Back to My Tickets
+              {tr(lang, "ticketDetail.backToTickets")}
             </Link>
           </Button>
         </div>
@@ -302,7 +429,32 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   }
 
   if (!ticket) {
-    return null;
+    // If the ticket isn't found (e.g. user has no access or invalid URL),
+    // show the same friendly "not found" state as the error branch instead
+    // of rendering an empty page.
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/my-tickets">
+              <ArrowLeft className="size-4 mr-2" />
+              {tr(lang, "ticketDetail.backToTickets")}
+            </Link>
+          </Button>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="size-12 text-red-500 mb-4" />
+            <h2 className="text-xl font-semibold mb-2">
+              {tr(lang, "ticketDetail.ticketNotFound")}
+            </h2>
+            <p className="text-muted-foreground text-center">
+              {tr(lang, "ticketDetail.ticketNotFoundDescription")}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -313,7 +465,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           <Button variant="ghost" size="sm" asChild>
             <Link href="/my-tickets">
               <ArrowLeft className="size-4 mr-2" />
-              Back to My Tickets
+              {tr(lang, "ticketDetail.backToTickets")}
             </Link>
           </Button>
         </div>
@@ -358,7 +510,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
                     <CalendarClock className="size-4" />
-                    <span>{ticket?.createdAt ? formatDateTimeSmart(ticket.createdAt) : 'Loading...'}</span>
+                    <span>{ticket?.createdAt ? formatDateTimeSmart(ticket.createdAt) : tr(lang, "ticketDetail.loading")}</span>
                   </div>
                 </div>
               </div>
@@ -367,12 +519,12 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <div className="space-y-4">
                 {ticket.title && (
                   <div>
-                    <h3 className="font-medium mb-2">Title</h3>
+                    <h3 className="font-medium mb-2">{tr(lang, "ticketDetail.title")}</h3>
                     <p className="text-sm">{ticket.title}</p>
                   </div>
                 )}
                 <div>
-                  <h3 className="font-medium mb-2">Description</h3>
+                  <h3 className="font-medium mb-2">{tr(lang, "ticketDetail.description")}</h3>
                   <p className="text-sm leading-relaxed">{ticket.description}</p>
                 </div>
               </div>
@@ -382,13 +534,13 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
           {/* Notes & Activity */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle>Notes & Activity</CardTitle>
+              <CardTitle>{tr(lang, "ticketDetail.notesAndActivity")}</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full">
                 <TabsList>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                  <TabsTrigger value="notes">Notes</TabsTrigger>
+                  <TabsTrigger value="activity">{tr(lang, "ticketDetail.tabs.activity")}</TabsTrigger>
+                  <TabsTrigger value="notes">{tr(lang, "ticketDetail.tabs.notes")}</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="activity" className="mt-4">
@@ -409,9 +561,9 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                       <div className="rounded-full bg-muted p-3 w-fit mx-auto mb-3">
                         <Flag className="size-6 text-muted-foreground" />
                       </div>
-                      <div className="text-sm text-muted-foreground">No activity yet</div>
+                      <div className="text-sm text-muted-foreground">{tr(lang, "ticketDetail.noActivity")}</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Changes and updates will appear here
+                        {tr(lang, "ticketDetail.noActivityHelper")}
                       </div>
                     </div>
                   ) : (
@@ -428,7 +580,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline" className="text-xs">
-                                    {h.changeType?.replace(/_/g, " ") ?? "Change"}
+                                    {h.changeType?.replace(/_/g, " ") ?? tr(lang, "ticketDetail.change")}
                                   </Badge>
                                   {h.field && (
                                     <span className="text-xs text-muted-foreground">
@@ -446,23 +598,23 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                               <div className="text-sm">
                                 {h.field === 'status' ? (
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span>Status changed from</span>
+                                    <span>{tr(lang, "ticketDetail.statusChangedFrom")}</span>
                                     <Badge variant="outline" className="capitalize">
                                       {(h.oldValue ?? '').toString().replace(/_/g, ' ')}
                                     </Badge>
-                                    <span>to</span>
+                                    <span>{tr(lang, "ticketDetail.statusChangedTo")}</span>
                                     <Badge variant="outline" className="capitalize">
                                       {(h.newValue ?? '').toString().replace(/_/g, ' ')}
                                     </Badge>
                                   </div>
                                 ) : (
-                                  <div>{h.description ?? `${h.field ?? 'Field'} updated`}</div>
+                                  <div>{h.description ?? `${h.field ?? 'Field'} ${tr(lang, "ticketDetail.fieldUpdated")}`}</div>
                                 )}
                               </div>
                               
                               {h.changedBy && (
                                 <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
-                                  Changed by: {formatChangedBy(h.changedBy)}
+                                  {tr(lang, "ticketDetail.changedBy")}: {formatChangedBy(h.changedBy, lang)}
                                 </div>
                               )}
                             </div>
@@ -478,7 +630,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <div className="space-y-3 mb-4">
                     <div className="flex items-start gap-3">
                       <Textarea
-                        placeholder="Add a note about this ticket..."
+                        placeholder={tr(lang, "ticketDetail.addNotePlaceholder")}
                         value={newNote}
                         onChange={(e) => setNewNote(e.target.value)}
                         rows={3}
@@ -494,19 +646,19 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         {addingNote ? (
                           <>
                             <Clock className="h-4 w-4 mr-1 animate-spin" />
-                            Adding...
+                            {tr(lang, "ticketDetail.addingNote")}
                           </>
                         ) : (
                           <>
                             <Send className="h-4 w-4 mr-1" />
-                            Add Note
+                            {tr(lang, "ticketDetail.addNote")}
                           </>
                         )}
                       </Button>
                     </div>
                     {newNote.length > 0 && (
                       <div className="text-xs text-muted-foreground text-right">
-                        {newNote.length}/1000 characters
+                        {newNote.length}/1000 {tr(lang, "ticketDetail.charactersCount")}
                       </div>
                     )}
                   </div>
@@ -528,7 +680,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                               <div className="opacity-70 mt-1">
                                 {formatDateTimeSmart(note.addedAt)}
                                 {note.addedBy && (
-                                  <span> • by {formatChangedBy(note.addedBy)}</span>
+                                  <span> • by {formatChangedBy(note.addedBy, lang)}</span>
                                 )}
                               </div>
                             )}
@@ -536,7 +688,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         ))}
                     </div>
                   ) : (
-                    <div className="text-xs text-muted-foreground">No notes yet</div>
+                    <div className="text-xs text-muted-foreground">{tr(lang, "ticketDetail.noNotes")}</div>
                   )}
                 </TabsContent>
                 
@@ -554,14 +706,27 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Flag className="size-4 text-blue-600" />
-                Status & Actions
+                {tr(lang, "ticketDetail.statusAndActions")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {canAssignMember && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setSelectedMemberId("");
+                    setAssignMemberOpen(true);
+                  }}
+                >
+                  {tr(lang, "teamTickets.actions.assign")}
+                </Button>
+              )}
               {/* Current Status */}
               <div className="p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Current Status</span>
+                  <span className="text-sm font-medium">{tr(lang, "ticketDetail.currentStatus")}</span>
                   {getStatusBadge(ticket.status)}
                 </div>
                 {/* Removed created/updated timestamp from this card as requested */}
@@ -569,7 +734,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               
               {/* Status Action Buttons */}
               <div className="space-y-3">
-                {ticket?.status === "assigned" && (
+                {ticket?.status === "assigned" && canUpdateStatus && (
                   <Button 
                     onClick={handleStartWork}
                     disabled={updatingStatus || isClosed}
@@ -579,44 +744,139 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                     {updatingStatus ? (
                       <>
                         <Clock className="size-3 mr-2 animate-spin" />
-                        Starting...
+                        {tr(lang, "ticketDetail.starting")}
                       </>
                     ) : (
                       <>
                         <Play className="size-3 mr-2" />
-                        Start Work
+                        {tr(lang, "ticketDetail.startWork")}
                       </>
                     )}
                   </Button>
                 )}
 
-                {ticket?.status === "in_progress" && (
-                  <Button 
-                    onClick={handleMarkResolved}
-                    disabled={updatingStatus || isClosed}
-                    className="w-full h-9"
-                    size="sm"
-                    variant="default"
-                  >
-                    {updatingStatus ? (
-                      <>
-                        <Clock className="size-3 mr-2 animate-spin" />
-                        Marking...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="size-3 mr-2" />
-                        Mark as Resolved
-                      </>
-                    )}
-                  </Button>
+                {ticket?.status === "in_progress" && canUpdateStatus && (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium flex items-center gap-2">
+                        <Image className="size-3 text-muted-foreground" />
+                        {tr(lang, "ticketDetail.completionPhoto")}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          key={proofInputKey}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) {
+                              setProofFile(null);
+                              setProofFileName("");
+                              if (proofPreviewUrl) {
+                                URL.revokeObjectURL(proofPreviewUrl);
+                                setProofPreviewUrl(null);
+                              }
+                              setProofInputKey((k) => k + 1);
+                              return;
+                            }
+                            if (!file.type.startsWith("image/")) {
+                              toast.error(tr(lang, "ticketDetail.pleaseUploadImage"));
+                              setProofFile(null);
+                              setProofFileName("");
+                              if (proofPreviewUrl) {
+                                URL.revokeObjectURL(proofPreviewUrl);
+                                setProofPreviewUrl(null);
+                              }
+                              setProofInputKey((k) => k + 1);
+                              return;
+                            }
+                            setProofFile(file);
+                            setProofFileName(file.name);
+                            if (proofPreviewUrl) {
+                              URL.revokeObjectURL(proofPreviewUrl);
+                            }
+                            const url = URL.createObjectURL(file);
+                            setProofPreviewUrl(url);
+                          }}
+                          className="sr-only"
+                          id={`file-input-${proofInputKey}`}
+                        />
+                        <label
+                          htmlFor={`file-input-${proofInputKey}`}
+                          className="flex h-9 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <span className="text-muted-foreground">
+                            {proofFileName || tr(lang, "ticketDetail.noFileChosen")}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 shrink-0"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              document.getElementById(`file-input-${proofInputKey}`)?.click();
+                            }}
+                          >
+                            {tr(lang, "ticketDetail.chooseFile")}
+                          </Button>
+                        </label>
+                      </div>
+                      {proofPreviewUrl && (
+                        <div className="mt-3 relative h-24 w-full overflow-hidden rounded-lg border bg-muted/40">
+                          <img
+                            src={proofPreviewUrl}
+                            alt={proofFileName || tr(lang, "ticketDetail.completionProofPreview")}
+                            className="h-full w-full object-cover"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="absolute top-1 right-1 h-7 w-7 bg-background/70 hover:bg-background"
+                            onClick={() => {
+                              if (proofPreviewUrl) {
+                                URL.revokeObjectURL(proofPreviewUrl);
+                              }
+                              setProofPreviewUrl(null);
+                              setProofFile(null);
+                              setProofFileName("");
+                              setProofInputKey((k) => k + 1);
+                            }}
+                          >
+                            <X className="size-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <Button 
+                      onClick={handleMarkResolved}
+                      disabled={updatingStatus || isClosed || !proofFile}
+                      className="w-full h-9"
+                      size="sm"
+                      variant="default"
+                    >
+                      {updatingStatus ? (
+                        <>
+                          <Clock className="size-3 mr-2 animate-spin" />
+                          {tr(lang, "ticketDetail.marking")}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="size-3 mr-2" />
+                          {tr(lang, "ticketDetail.markAsResolved")}
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
 
                 {ticket?.status === "resolved" && (
                   <div className="p-3 bg-muted/30 rounded-lg border text-center">
                     <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                       <Clock className="size-4" />
-                      <span>Awaiting user confirmation</span>
+                      <span>{tr(lang, "ticketDetail.awaitingConfirmation")}</span>
                     </div>
                   </div>
                 )}
@@ -629,12 +889,56 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 {ticket?.updatedAt && ticket.updatedAt !== ticket.createdAt && (
                   <div className="flex items-center gap-2">
                     <Clock className="size-3" />
-                    <span>Updated {formatDateTimeSmart(ticket.updatedAt)}</span>
+                    <span>{tr(lang, "ticketDetail.updated")} {formatDateTimeSmart(ticket.updatedAt)}</span>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
+
+          {!assignedTeamCount && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="size-4 text-emerald-600" />
+                  {tr(lang, "ticketDetail.assignTicket")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {tr(lang, "ticketDetail.notAssignedDescription")}
+                </p>
+                {primaryTeamId ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">
+                      {tr(lang, "ticketDetail.team")}: {primaryTeam?.name ?? tr(lang, "ticketDetail.myTeam")}
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={handleAssignToMyTeam}
+                      disabled={assigning}
+                    >
+                      {assigning ? (
+                        <>
+                          <Clock className="size-4 mr-2 animate-spin" />
+                          {tr(lang, "ticketDetail.assigning")}
+                        </>
+                      ) : (
+                        <>
+                          <Users className="size-4 mr-2" />
+                          {tr(lang, "ticketDetail.assignToMyTeam")}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    {tr(lang, "ticketDetail.needTeamLeadAccess")}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
 
           {/* Reporter Info */}
@@ -643,7 +947,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <UserIcon className="size-4" />
-                  Reported By
+                  {tr(lang, "ticketDetail.reportedBy")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -664,7 +968,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Tag className="size-4" />
-                  Tags
+                  {tr(lang, "ticketDetail.tags")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -685,7 +989,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <AlertCircle className="size-4" />
-                  Alerts
+                  {tr(lang, "ticketDetail.alerts")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -693,7 +997,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950/20 rounded-md">
                     <AlertCircle className="size-4 text-orange-600" />
                     <span className="text-sm text-orange-700 dark:text-orange-300">
-                      Ticket has been escalated
+                      {tr(lang, "ticketDetail.escalated")}
                     </span>
                   </div>
                 )}
@@ -701,7 +1005,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/20 rounded-md">
                     <Clock className="size-4 text-red-600" />
                     <span className="text-sm text-red-700 dark:text-red-300">
-                      SLA deadline breached
+                      {tr(lang, "ticketDetail.slaBreached")}
                     </span>
                   </div>
                 )}
@@ -715,7 +1019,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="size-5 text-blue-600" />
-                  Incident Location
+                  {tr(lang, "ticketDetail.incidentLocation")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -729,10 +1033,10 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         </div>
                         <div>
                           <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
-                            GPS Location
+                            {tr(lang, "ticketDetail.gpsLocation")}
                           </p>
                           <p className="text-xs text-blue-700 dark:text-blue-300">
-                            Precise coordinates available
+                            {tr(lang, "ticketDetail.preciseCoordinatesAvailable")}
                           </p>
                         </div>
                       </div>
@@ -743,7 +1047,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         className="bg-white dark:bg-blue-950 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-700 dark:text-blue-300 h-7 px-2"
                       >
                         <ExternalLink className="size-3 mr-1" />
-                        View
+                        {tr(lang, "ticketDetail.view")}
                       </Button>
                     </div>
                   )}
@@ -752,7 +1056,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   {!ticket.location?.coordinates && !ticket.coordinates && !ticket.location && (
                     <div className="text-center py-6 text-muted-foreground">
                       <MapPin className="size-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No location information available</p>
+                      <p className="text-sm">{tr(lang, "ticketDetail.noLocationInfo")}</p>
                     </div>
                   )}
                 </div>
@@ -765,7 +1069,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="size-5 text-green-600" />
-                Attachments
+                {tr(lang, "ticketDetail.attachments")}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -775,7 +1079,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <Skeleton className="h-16 w-3/4" />
                 </div>
               ) : attachments.length === 0 ? (
-                <div className="text-xs text-muted-foreground text-center py-4">No attachments</div>
+                <div className="text-xs text-muted-foreground text-center py-4">{tr(lang, "ticketDetail.noAttachments")}</div>
               ) : (
                 <div className="grid gap-3">
                   {attachments.map((att) => (
@@ -787,17 +1091,17 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         ) : isVideo(att.mimeType) ? (
                           <div className="flex flex-col items-center gap-2 text-muted-foreground">
                             <Video className="size-8" />
-                            <span className="text-xs font-medium">VIDEO</span>
+                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.video")}</span>
                           </div>
                         ) : isPdf(att.mimeType) ? (
                           <div className="flex flex-col items-center gap-2 text-muted-foreground">
                             <FileText className="size-8" />
-                            <span className="text-xs font-medium">PDF</span>
+                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.pdf")}</span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-2 text-muted-foreground">
                             <File className="size-8" />
-                            <span className="text-xs font-medium">FILE</span>
+                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.file")}</span>
                           </div>
                         )}
                       </div>
@@ -846,7 +1150,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               {previewAttachment && isVideo(previewAttachment.mimeType) && <Video className="size-5" />}
               {previewAttachment && isPdf(previewAttachment.mimeType) && <FileText className="size-5" />}
               {previewAttachment && !isImage(previewAttachment.mimeType) && !isVideo(previewAttachment.mimeType) && !isPdf(previewAttachment.mimeType) && <File className="size-5" />}
-              Preview
+              {tr(lang, "ticketDetail.preview")}
             </DialogTitle>
             {previewAttachment && (
               <DialogDescription className="flex items-center justify-between">
@@ -854,7 +1158,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 <Button asChild size="sm" variant="outline">
                   <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
                     <ExternalLink className="size-3" />
-                    Open Original
+                    {tr(lang, "ticketDetail.openOriginal")}
                   </a>
                 </Button>
               </DialogDescription>
@@ -872,15 +1176,88 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 <div className="text-center py-12">
                   <File className="size-16 text-muted-foreground mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground">
-                    Preview not available for this file type
+                    {tr(lang, "ticketDetail.previewNotAvailable")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Use &quot;Open Original&quot; to view the file
+                    {tr(lang, "ticketDetail.useOpenOriginal")}
                   </p>
                 </div>
               )
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Member Dialog (team lead view) */}
+      <Dialog
+        open={assignMemberOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAssignMemberOpen(false);
+            setSelectedMemberId("");
+          } else {
+            setAssignMemberOpen(true);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{tr(lang, "teamTickets.assignMember.title")}</DialogTitle>
+            <DialogDescription>
+              {tr(lang, "teamTickets.assignMember.selectLabel")}
+            </DialogDescription>
+          </DialogHeader>
+
+          {teamMembers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {tr(lang, "teamTickets.assignMember.noMembers")}
+            </p>
+          ) : (
+            <div className="grid gap-3">
+              <label className="text-sm font-medium">
+                {tr(lang, "teamTickets.assignMember.selectLabel")}
+              </label>
+              <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={tr(lang, "teamTickets.assignMember.selectPlaceholder")}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member._id} value={member._id}>
+                      {(member.fullName ??
+                        `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim()) ||
+                        member.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setAssignMemberOpen(false);
+                setSelectedMemberId("");
+              }}
+              disabled={assigningMember}
+            >
+              {tr(lang, "teamTickets.assignMember.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleAssignMember}
+              disabled={assigningMember || teamMembers.length === 0}
+            >
+              {assigningMember
+                ? tr(lang, "teamTickets.assignMember.assigning")
+                : tr(lang, "teamTickets.assignMember.assign")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

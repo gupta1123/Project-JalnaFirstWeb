@@ -12,6 +12,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { api, adminGetTickets } from '@/lib/api';
 import Image from 'next/image';
+import { useLanguage } from '@/components/LanguageProvider';
+import { tr } from '@/lib/i18n';
 import {
   Mail,
   Phone,
@@ -42,6 +44,7 @@ type User = {
   isActive?: boolean;
   isBlocked?: boolean;
   isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
   profileVisibility?: 'public' | 'private' | string;
   preferredLanguage?: string;
   createdAt?: string;
@@ -132,6 +135,7 @@ const mapsLink = (c?: Coordinates, city?: string) => {
 
 /* -------------------- Page -------------------- */
 export default function UserDetailPage() {
+  const { lang } = useLanguage();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const userId = params?.id as string;
@@ -180,7 +184,7 @@ export default function UserDetailPage() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[520px]">
                   <DialogHeader>
-                    <DialogTitle className="sr-only">Profile photo</DialogTitle>
+                    <DialogTitle className="sr-only">{tr(lang, "userDetail.profilePhoto")}</DialogTitle>
                   </DialogHeader>
                   {(() => {
                     const url = resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto);
@@ -203,14 +207,10 @@ export default function UserDetailPage() {
                   <UserRound className="h-5 w-5 opacity-90" /> {isLoading ? <Skeleton className="h-6 w-40" /> : fullName}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                  <Badge variant="secondary">{today}</Badge>
                   {user?.isActive ? (
-                    <Badge variant="secondary" className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Active</Badge>
+                    <Badge variant="secondary" className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {tr(lang, "userDetail.status.active")}</Badge>
                   ) : (
-                    <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5" /> Inactive</Badge>
-                  )}
-                  {user?.profileVisibility && (
-                    <Badge variant="secondary">{user.profileVisibility}</Badge>
+                    <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5" /> {tr(lang, "userDetail.status.inactive")}</Badge>
                   )}
                 </div>
               </div>
@@ -223,64 +223,52 @@ export default function UserDetailPage() {
 
       {/* LEFT: Contact & Profile */}
       <Card className="lg:col-span-2">
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          <InfoItem icon={<Mail className="h-4 w-4" />} label="Email" value={user?.email} copyable />
-          <InfoItem icon={<Phone className="h-4 w-4" />} label="Phone" value={user?.phoneNumber} copyable />
-          <InfoItem icon={<Shield className="h-4 w-4" />} label="Email verified" value={user?.isEmailVerified ? 'Yes' : 'No'} chip />
-          <InfoItem icon={<CalendarClock className="h-4 w-4" />} label="Joined" value={fmtDate(user?.createdAt)} helper={relativeTime(user?.createdAt)} />
-          
-           <InfoItem icon={<Shield className="h-4 w-4" />} label="Aadhaar" value={user?.aadhaarNumber ?? '—'} />
-        </CardContent>
-      </Card>
-
-    <Card>
-        <CardHeader className="pb-2"><CardTitle>Location</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          <InfoRow icon={<MapPin className="h-4 w-4" />} label="City" value={user?.location?.city} />
-          <InfoRow icon={<Globe className="h-4 w-4" />} label="State" value={user?.location?.state} />
-          <InfoRow icon={<Globe className="h-4 w-4" />} label="Country" value={user?.location?.country} />
-          <InfoRow icon={<MapPin className="h-4 w-4" />} label="Coordinates" value={coordsText(user?.location?.coordinates)} copyable />
-          {mapsLink(user?.location?.coordinates, user?.location?.city) && (
-            <Button size="sm" variant="secondary" asChild>
-              <a href={mapsLink(user?.location?.coordinates, user?.location?.city)} target="_blank" rel="noreferrer">View on map</a>
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-      <CardContent>
-          <div className="rounded-xl border p-4 bg-muted/20">
-            <div className="text-sm leading-relaxed">
-              {formatAddressLines(user?.address) || '—'}
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <InfoItem icon={<Mail className="h-4 w-4" />} label={tr(lang, "userDetail.labels.email")} value={user?.email} copyable lang={lang} />
+              <InfoItem icon={<Phone className="h-4 w-4" />} label={tr(lang, "userDetail.labels.phone")} value={user?.phoneNumber} copyable lang={lang} />
+              <InfoItem icon={<Shield className="h-4 w-4" />} label={tr(lang, "userDetail.labels.mobileVerified")} value={user?.isPhoneVerified ? tr(lang, "userDetail.yes") : tr(lang, "userDetail.no")} chip lang={lang} />
+            </div>
+            <div className="space-y-4">
+              <InfoItem icon={<CalendarClock className="h-4 w-4" />} label={tr(lang, "userDetail.labels.joined")} value={fmtDate(user?.createdAt)} helper={relativeTime(user?.createdAt)} lang={lang} />
+              <InfoItem icon={<Shield className="h-4 w-4" />} label={tr(lang, "userDetail.labels.aadhaar")} value={user?.aadhaarNumber ?? '—'} lang={lang} />
+              <InfoItem icon={<Globe className="h-4 w-4" />} label={tr(lang, "userDetail.labels.preferredLanguage")} value={user?.preferredLanguage?.toUpperCase()} lang={lang} />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
+    <Card>
+        <CardHeader className="pb-2"><CardTitle>{tr(lang, "userDetail.labels.location")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <InfoRow icon={<Globe className="h-4 w-4" />} label="Preferred language" value={user?.preferredLanguage?.toUpperCase()} />
+          <InfoRow icon={<MapPin className="h-4 w-4" />} label={tr(lang, "userDetail.labels.address")} value={formatAddressLines(user?.address)} lang={lang} />
+          <InfoRow icon={<MapPin className="h-4 w-4" />} label={tr(lang, "userDetail.labels.coordinates")} value={coordsText(user?.location?.coordinates)} copyable lang={lang} />
+          {mapsLink(user?.location?.coordinates, user?.location?.city) && (
+            <Button size="sm" variant="secondary" asChild>
+              <a href={mapsLink(user?.location?.coordinates, user?.location?.city)} target="_blank" rel="noreferrer">{tr(lang, "userDetail.viewOnMap")}</a>
+            </Button>
+          )}
         </CardContent>
       </Card>
 
       {/* Recent tickets */}
       <Card className="lg:col-span-3">
-        <CardHeader className="pb-2"><CardTitle>Recent tickets</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle>{tr(lang, "userDetail.labels.recentTickets")}</CardTitle></CardHeader>
         <CardContent>
           {userTickets.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No tickets</div>
+            <div className="text-sm text-muted-foreground">{tr(lang, "userDetail.noTickets")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-muted-foreground">
                   <tr className="text-left">
-                    <th className="py-2 pr-4">Number</th>
-                    <th className="py-2 pr-4">Title</th>
-                    <th className="py-2 pr-4">Category</th>
-                    <th className="py-2 pr-4">Priority</th>
-                    <th className="py-2 pr-4">Status</th>
-                    <th className="py-2 pr-0">Created</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.number")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.title")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.category")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.priority")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.status")}</th>
+                    <th className="py-2 pr-0">{tr(lang, "userDetail.table.created")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -332,24 +320,25 @@ function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
   );
 }
 
-function InfoItem({ icon, label, value, helper, copyable, chip }: { icon: React.ReactNode; label: string; value?: string; helper?: string; copyable?: boolean; chip?: boolean }) {
+function InfoItem({ icon, label, value, helper, copyable, chip, lang }: { icon: React.ReactNode; label: string; value?: string; helper?: string; copyable?: boolean; chip?: boolean; lang?: "en" | "hi" | "mr" }) {
   const [copied, setCopied] = useState(false);
   const show = value && value.trim().length > 0 ? value : '—';
   const handleCopy = async () => {
     if (!copyable || !value) return;
     try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch {}
   };
+  const currentLang = lang || "en";
   return (
     <div className="flex flex-col gap-1">
       <div className="text-xs text-muted-foreground flex items-center gap-2">{icon}<span>{label}</span></div>
       <div className="flex items-center gap-2">
         {chip ? (
-          <Badge variant={show === 'Yes' ? 'default' : 'outline'}>{show}</Badge>
+          <Badge variant={show === tr(currentLang, "userDetail.yes") ? 'default' : 'outline'}>{show}</Badge>
         ) : (
           <span className="text-sm font-medium">{show}</span>
         )}
         {copyable && value && (
-          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</Button>
+          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={handleCopy}>{copied ? tr(currentLang, "userDetail.copied") : tr(currentLang, "userDetail.copy")}</Button>
         )}
       </div>
       {helper && <div className="text-[11px] text-muted-foreground">{helper}</div>}
@@ -357,14 +346,15 @@ function InfoItem({ icon, label, value, helper, copyable, chip }: { icon: React.
   );
 }
 
-function InfoRow({ icon, label, value, copyable }: { icon: React.ReactNode; label: string; value?: string; copyable?: boolean }) {
+function InfoRow({ icon, label, value, copyable, lang }: { icon: React.ReactNode; label: string; value?: string; copyable?: boolean; lang?: "en" | "hi" | "mr" }) {
+  const currentLang = lang || "en";
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">{icon}</span><span>{label}</span></div>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium">{value && value.trim().length ? value : '—'}</span>
         {copyable && value && (
-          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={() => navigator.clipboard.writeText(value)}>Copy</Button>
+          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={() => navigator.clipboard.writeText(value)}>{tr(currentLang, "userDetail.copy")}</Button>
         )}
       </div>
     </div>
