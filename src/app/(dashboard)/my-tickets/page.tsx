@@ -72,7 +72,7 @@ export default function MyTicketsPage() {
       return;
     }
     setSelectedTickets((prev) =>
-      prev.filter((id) => swrTickets.some((ticket) => ticket.id === id && !ticket.assignedUser))
+      prev.filter((id) => swrTickets.some((ticket) => ticket.id === id && !ticket.assignedUser && ticket.status !== 'resolved' && ticket.status !== 'closed'))
     );
   }, [swrTickets]);
 
@@ -310,7 +310,7 @@ export default function MyTicketsPage() {
                   return (
                   <TableRow key={ticket.id}>
                     <TableCell className="w-10 text-center">
-                      {isTeamLead && isUnassigned ? (
+                      {isTeamLead && isUnassigned && ticket.status !== 'resolved' && ticket.status !== 'closed' ? (
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -380,7 +380,7 @@ export default function MyTicketsPage() {
                             tr(lang, "teamTickets.table.assignedTo.none")
                           );
                         })()
-                      ) : isTeamLead ? (
+                      ) : isTeamLead && ticket.status !== 'resolved' && ticket.status !== 'closed' ? (
                         <Button
                           variant="outline"
                           size="sm"
