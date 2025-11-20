@@ -421,6 +421,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Styles */}
+      <div className="xl:col-span-3 mt-8 text-center pb-4">
+        <p className="text-xs text-muted-foreground font-medium opacity-70">Powered by Nyx Solutions</p>
+      </div>
+
       <style jsx global>{`
         .animated-gradient-surface { position: relative; border-radius: 0.75rem; background-image: linear-gradient(135deg, var(--grad-from), var(--grad-to)); background-size: 100% 100%; }
         /* Subtle grain that remains visible in light and dark */

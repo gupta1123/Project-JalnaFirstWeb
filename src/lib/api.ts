@@ -2,7 +2,7 @@
 
 import axios from "axios";
 import Cookies from "js-cookie";
-import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory, TeamStatsResponse } from "./types";
+import type { User, AgencyContact, Pagination, Complaint, Ticket, TicketStatus, Team, Category, SubCategory, TeamStatsResponse, AdminTeamStatsResponse } from "./types";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://jalnafirst-d1c348495722.herokuapp.com";
 
@@ -774,9 +774,9 @@ export async function getAdminTeamStats(params?: {
   startDate?: string;
   endDate?: string;
   teamId?: string;
-}) {
+}): Promise<AdminTeamStatsResponse> {
   const res = await api.get("/api/admin/team-stats", { params });
-  return res.data as unknown;
+  return res.data as AdminTeamStatsResponse;
 }
 
 // Categories API

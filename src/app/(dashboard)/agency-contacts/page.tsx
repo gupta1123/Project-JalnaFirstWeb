@@ -12,6 +12,7 @@ import type { AgencyContact } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ import { tr } from "@/lib/i18n";
 export default function AgencyContactsPage() {
   const { lang } = useLanguage();
   const [search, setSearch] = useState("");
+  const [agencyTypeFilter, setAgencyTypeFilter] = useState<string>("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState<null | string>(null);
   const [isViewOpen, setIsViewOpen] = useState<null | string>(null);
@@ -54,8 +56,14 @@ export default function AgencyContactsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data, isLoading, mutate } = useSWR(
-    ["agency-contacts", search],
-    async () => await getAgencyContacts({ search, page: 1, limit: 20 }),
+    ["agency-contacts", search, agencyTypeFilter],
+    async () =>
+      await getAgencyContacts({
+        search,
+        agencyType: agencyTypeFilter || undefined,
+        page: 1,
+        limit: 20,
+      }),
     { revalidateOnFocus: false }
   );
 
@@ -131,6 +139,8 @@ export default function AgencyContactsPage() {
     }
   };
 
+  const agencyTypeOptions: Array<AgencyContact["agencyType"]> = ["police", "fire", "medical", "municipal", "government", "other"];
+
   return (
     <div className="grid gap-4">
       <Card>
@@ -138,13 +148,26 @@ export default function AgencyContactsPage() {
           <div className="flex items-center justify-between gap-2">
             <CardTitle>{tr(lang, "agencyContacts.title")}</CardTitle>
             <div className="flex items-center gap-2">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Input
                   placeholder={tr(lang, "agencyContacts.searchPlaceholder")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-64"
                 />
+                <Select value={agencyTypeFilter || "all"} onValueChange={(value) => setAgencyTypeFilter(value === "all" ? "" : value)}>
+                  <SelectTrigger className="w-48" aria-label={tr(lang, "agencyContacts.filters.typeLabel")}>
+                    <SelectValue placeholder={tr(lang, "agencyContacts.filters.typeLabel")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{tr(lang, "agencyContacts.filters.allTypes")}</SelectItem>
+                    {agencyTypeOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {tr(lang, `agencyContacts.form.types.${type}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button onClick={() => mutate()} variant="secondary">{tr(lang, "agencyContacts.search")}</Button>
               </div>
               <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

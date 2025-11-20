@@ -22,6 +22,9 @@ function LoginPageContent() {
           <LoginForm />
         </Suspense>
       </div>
+      <div className="mt-8 text-center">
+        <p className="text-xs text-muted-foreground font-medium opacity-70">Powered by Nyx Solutions</p>
+      </div>
     </div>
   );
 }

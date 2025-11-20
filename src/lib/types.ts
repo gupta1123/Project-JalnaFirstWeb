@@ -279,6 +279,30 @@ export type TeamStatsResponse = {
   members: TeamMemberStat[];
 };
 
+export type AdminTeamStatsResponse = {
+  dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  overallTotals: TicketStatusTotals;
+  totalTeams: number;
+  teams: Array<{
+    team: {
+      id: string;
+      name: string;
+      description?: string;
+      areas?: Array<{
+        zone: string;
+        area: string;
+        city: string;
+        state: string;
+      }>;
+    };
+    teamStats: TicketStatusTotals;
+    members: TeamMemberStat[];
+  }>;
+};
+
 // Category type
 export type Category = {
   id: string;

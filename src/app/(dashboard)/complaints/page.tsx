@@ -2,17 +2,16 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { adminGetTickets } from "@/lib/api";
 import type { Ticket } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -72,6 +71,7 @@ export default function ComplaintsPage() {
   ] as const;
 
   const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
   const [limit] = useState(15);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("open");
@@ -95,6 +95,36 @@ export default function ComplaintsPage() {
   const { data, isLoading, mutate } = useSWR(["tickets-admin", params], () => adminGetTickets(params));
   const tickets: Ticket[] = data?.tickets ?? [];
   const pagination = data?.pagination;
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    if (!pagination) return;
+    const lastPage = Math.max(1, pagination.totalPages || 1);
+    if (page > lastPage) {
+      setPage(lastPage);
+    }
+  }, [pagination, page]);
+
+  const getNormalizedJumpTarget = (): number | null => {
+    if (!pagination) return null;
+    if (!pageInput.trim()) return null;
+    const parsed = Number(pageInput);
+    if (Number.isNaN(parsed)) return null;
+    const total = Math.max(1, pagination.totalPages || 1);
+    const normalized = Math.max(1, Math.min(total, Math.floor(parsed)));
+    if (normalized === page) return null;
+    return normalized;
+  };
+
+  const handlePageJump = () => {
+    const target = getNormalizedJumpTarget();
+    if (target) {
+      setPage(target);
+    }
+  };
 
   const getStatusKey = (status: string): string => {
     const statusMap: Record<string, string> = {
@@ -251,24 +281,138 @@ export default function ComplaintsPage() {
           </Table>
         </div>
         {pagination && (
-          <Pagination className="pt-2">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (pagination.hasPrevPage) setPage((p) => Math.max(1, p - 1)); }} />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationLink href="#" isActive>{pagination.currentPage}</PaginationLink>
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (pagination.hasNextPage) setPage((p) => p + 1); }} />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+          <div className="flex flex-col gap-3 pt-2 lg:flex-row lg:items-center lg:justify-between">
+            <Pagination className="order-2 lg:order-1">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    href="#" 
+                    onClick={(e) => { 
+                      e.preventDefault(); 
+                      if (pagination.hasPrevPage) setPage((p) => Math.max(1, p - 1)); 
+                    }}
+                    className={!pagination.hasPrevPage ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                
+                {(() => {
+                  const total = Math.max(1, pagination.totalPages || 1);
+                  const current = Math.min(Math.max(1, pagination.currentPage), total);
+                  const windowSize = 2;
+                  const jumpSize = 10;
+                  const items: Array<number | { type: "ellipsis"; key: string; target: number }> = [];
+
+                  items.push(1);
+
+                  let start = Math.max(2, current - windowSize);
+                  let end = Math.min(total - 1, current + windowSize);
+
+                  if (current <= windowSize + 1) {
+                    end = Math.min(total - 1, 1 + windowSize * 2);
+                  }
+                  if (current >= total - windowSize) {
+                    start = Math.max(2, total - windowSize * 2);
+                  }
+
+                  if (start > 2) {
+                    items.push({ type: "ellipsis", key: "ellipsis-start", target: Math.max(1, current - jumpSize) });
+                  }
+
+                  for (let i = start; i <= end; i++) {
+                    items.push(i);
+                  }
+
+                  if (end < total - 1) {
+                    items.push({ type: "ellipsis", key: "ellipsis-end", target: Math.min(total, current + jumpSize) });
+                  }
+
+                  if (total > 1) {
+                    items.push(total);
+                  }
+
+                  return items.map((item) => {
+                    if (typeof item === "object" && "type" in item) {
+                      return (
+                        <PaginationItem key={item.key}>
+                          <PaginationEllipsis
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Jump to page ${item.target}`}
+                            className="cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPage(item.target);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setPage(item.target);
+                              }
+                            }}
+                          />
+                        </PaginationItem>
+                      );
+                    }
+                    return (
+                      <PaginationItem key={item}>
+                        <PaginationLink
+                          href="#"
+                          isActive={item === current}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPage(item);
+                          }}
+                        >
+                          {item}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  });
+                })()}
+
+                <PaginationItem>
+                  <PaginationNext 
+                    href="#" 
+                    onClick={(e) => { 
+                      e.preventDefault(); 
+                      if (pagination.hasNextPage) setPage((p) => p + 1); 
+                    }}
+                    className={!pagination.hasNextPage ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            {(pagination.totalPages ?? 0) > 10 && (
+              <form
+                className="order-1 flex flex-col gap-1 text-sm lg:order-2 lg:text-right"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handlePageJump();
+                }}
+              >
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Jump to page</span>
+                <div className="flex items-center gap-2 lg:justify-end">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, pagination.totalPages || 1)}
+                    value={pageInput}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    className="h-9 w-[110px]"
+                    aria-label="Go to page"
+                  />
+                  <Button type="submit" size="sm" variant="secondary" disabled={!getNormalizedJumpTarget()}>
+                    Go
+                  </Button>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Page {page} of {Math.max(1, pagination.totalPages || 1)}
+                </span>
+              </form>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
-
-
-

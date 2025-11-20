@@ -43,12 +43,8 @@ const getNavigationData = (userRole: string, isTeamLead: boolean = false) => {
       ...(isAdmin ? [{ nameKey: "sidebar.nav.agencyContacts", url: "/agency-contacts", icon: Megaphone }] : []),
       ...(isAdmin ? [{ nameKey: "sidebar.nav.teams", url: "/teams", icon: UsersRound }] : []),
       // ...(isAdmin ? [{ name: "Categories", url: "/admin-categories", icon: Tags }] : []), // Hidden from sidebar
-      ...(isTeamLead
-        ? [
-            { nameKey: "sidebar.nav.teamMembers", url: "/team-members", icon: UserCheck },
-            { nameKey: "sidebar.nav.reports", url: "/reports", icon: BarChart3 },
-          ]
-        : []),
+      ...(isTeamLead ? [{ nameKey: "sidebar.nav.teamMembers", url: "/team-members", icon: UserCheck }] : []),
+      ...(isAdmin ? [{ nameKey: "sidebar.nav.reports", url: "/reports", icon: BarChart3 }] : []),
       // ...(isTeamLead ? [{ name: "Categories", url: "/categories", icon: Tags }] : []), // Hidden from sidebar
     ],
   };
@@ -105,6 +101,9 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarContent>
       <SidebarFooter>
+        <div className="px-4 py-2 text-center">
+          <p className="text-[10px] text-muted-foreground">Powered by Nyx Solutions</p>
+        </div>
         <UserMenu />
       </SidebarFooter>
     </Sidebar>
