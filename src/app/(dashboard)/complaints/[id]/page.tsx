@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, ExternalLink, Eye, Image, Video, File } from "lucide-react";
+import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, ExternalLink, Eye, Image, Video, File, User as UserIcon } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import type { Ticket, TicketStatus, User, ChangedBy } from "@/lib/types";
 import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments } from "@/lib/api";
@@ -385,6 +385,61 @@ export default function ComplaintDetailPage() {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+            </div>
+
+            {/* Assigned Member Card */}
+            <div className="rounded-lg border p-4 grid gap-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <UserIcon className="size-4 text-muted-foreground" /> 
+                  {tr(lang, "complaintDetail.assignedTo")}
+                </div>
+              </div>
+              
+              {ticket.assignedUser ? (
+                <div className="space-y-2">
+                  <div className="rounded border p-3 bg-muted/30">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-full">
+                        <UserIcon className="size-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">
+                          {(() => {
+                            const assignedUser = ticket.assignedUser as User | {
+                              firstName?: string;
+                              lastName?: string;
+                              fullName?: string;
+                              email?: string;
+                            };
+                            const fullName =
+                              assignedUser.fullName ||
+                              ((assignedUser as { firstName?: string; lastName?: string }).firstName &&
+                                (assignedUser as { firstName?: string; lastName?: string }).lastName
+                                ? `${(assignedUser as { firstName?: string }).firstName} ${(assignedUser as { lastName?: string }).lastName}`
+                                : null) ||
+                              assignedUser.email ||
+                              tr(lang, "complaintDetail.unknownUser");
+                            return fullName;
+                          })()}
+                        </div>
+                        {ticket.assignedUser && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {(() => {
+                              const assignedUser = ticket.assignedUser as User | { email?: string };
+                              return (assignedUser as { email?: string }).email || "";
+                            })()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  {tr(lang, "complaintDetail.noOneAssigned")}
+                </div>
               )}
             </div>
 

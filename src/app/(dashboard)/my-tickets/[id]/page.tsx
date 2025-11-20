@@ -269,7 +269,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     );
 
   const canUpdateStatus = !!ticket && (isAssignedUser || isLeaderForTicketTeam);
-  const canAssignMember = !!ticket && !ticket.assignedUser && isTeamLead;
+  const canAssignMember = !!ticket && !ticket.assignedUser && isTeamLead && ticket.status !== 'resolved' && ticket.status !== 'closed';
 
   // Split attachments into those uploaded by citizens vs team members (staff/team leads).
   // Use the uploadedByRole field from the API to determine the category.
@@ -1030,6 +1030,65 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Assigned Member Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <UserIcon className="size-4 text-purple-600" />
+                {tr(lang, "ticketDetail.assignedTo")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {ticket.assignedUser ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-purple-50 dark:bg-purple-950/20 rounded-full">
+                      <UserIcon className="size-4 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">
+                        {(() => {
+                          const assignedUser = ticket.assignedUser as User | {
+                            firstName?: string;
+                            lastName?: string;
+                            fullName?: string;
+                            email?: string;
+                          };
+                          const fullName =
+                            assignedUser.fullName ||
+                            ((assignedUser as { firstName?: string; lastName?: string }).firstName &&
+                              (assignedUser as { firstName?: string; lastName?: string }).lastName
+                              ? `${(assignedUser as { firstName?: string }).firstName} ${(assignedUser as { lastName?: string }).lastName}`
+                              : null) ||
+                            assignedUser.email ||
+                            tr(lang, "ticketDetail.unknownUser");
+                          return fullName;
+                        })()}
+                      </p>
+                      {ticket.assignedUser && (
+                        <p className="text-xs text-muted-foreground">
+                          {(() => {
+                            const assignedUser = ticket.assignedUser as User | { email?: string };
+                            return (assignedUser as { email?: string }).email || "";
+                          })()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="p-3 bg-muted/30 rounded-full w-fit mx-auto mb-2">
+                    <UserIcon className="size-5 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {tr(lang, "ticketDetail.noOneAssigned")}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

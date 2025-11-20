@@ -299,6 +299,9 @@ const messages: Record<Lang, Messages> = {
     "complaintDetail.created": "Created",
     "complaintDetail.updated": "Updated",
     "complaintDetail.assignedTeams": "Assigned Teams",
+    "complaintDetail.assignedTo": "Assigned To",
+    "complaintDetail.assignedMember": "Assigned Member",
+    "complaintDetail.noOneAssigned": "No one assigned",
     "complaintDetail.team": "team",
     "complaintDetail.teams": "teams",
     "complaintDetail.active": "Active",
@@ -418,6 +421,9 @@ const messages: Record<Lang, Messages> = {
     "ticketDetail.noteAddedSuccessfully": "Note added successfully",
     "ticketDetail.failedToAddNote": "Failed to add note",
     "ticketDetail.loading": "Loading...",
+    "ticketDetail.assignedTo": "Assigned To",
+    "ticketDetail.assignedMember": "Assigned Member",
+    "ticketDetail.noOneAssigned": "No one assigned",
 
     // Users list page (admin)
     "users.title": "Users Management",
@@ -1107,6 +1113,9 @@ const messages: Record<Lang, Messages> = {
     "complaintDetail.created": "बनाया गया",
     "complaintDetail.updated": "अपडेट किया गया",
     "complaintDetail.assignedTeams": "असाइन टीमें",
+    "complaintDetail.assignedTo": "असाइन किया गया",
+    "complaintDetail.assignedMember": "असाइन सदस्य",
+    "complaintDetail.noOneAssigned": "कोई असाइन नहीं",
     "complaintDetail.team": "टीम",
     "complaintDetail.teams": "टीमें",
     "complaintDetail.active": "सक्रिय",
@@ -1226,6 +1235,9 @@ const messages: Record<Lang, Messages> = {
     "ticketDetail.noteAddedSuccessfully": "नोट सफलतापूर्वक जोड़ा गया",
     "ticketDetail.failedToAddNote": "नोट जोड़ने में विफल",
     "ticketDetail.loading": "लोड हो रहा है...",
+    "ticketDetail.assignedTo": "असाइन किया गया",
+    "ticketDetail.assignedMember": "असाइन सदस्य",
+    "ticketDetail.noOneAssigned": "कोई असाइन नहीं",
 
     // Users list page (admin)
     "users.title": "उपयोगकर्ता प्रबंधन",
@@ -1916,6 +1928,9 @@ const messages: Record<Lang, Messages> = {
     "complaintDetail.created": "तयार केले",
     "complaintDetail.updated": "अद्यतन केले",
     "complaintDetail.assignedTeams": "असाइन टीम",
+    "complaintDetail.assignedTo": "असाइन केले",
+    "complaintDetail.assignedMember": "असाइन सदस्य",
+    "complaintDetail.noOneAssigned": "कोणीही असाइन नाही",
     "complaintDetail.team": "टीम",
     "complaintDetail.teams": "टीम",
     "complaintDetail.active": "सक्रिय",
@@ -2035,6 +2050,9 @@ const messages: Record<Lang, Messages> = {
     "ticketDetail.noteAddedSuccessfully": "नोट यशस्वीरित्या जोडला",
     "ticketDetail.failedToAddNote": "नोट जोडण्यात अयशस्वी",
     "ticketDetail.loading": "लोड होत आहे...",
+    "ticketDetail.assignedTo": "असाइन केले",
+    "ticketDetail.assignedMember": "असाइन सदस्य",
+    "ticketDetail.noOneAssigned": "कोणीही असाइन नाही",
 
     // Users list page (admin)
     "users.title": "वापरकर्ते व्यवस्थापन",
