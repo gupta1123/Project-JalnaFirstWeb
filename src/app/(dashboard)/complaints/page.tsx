@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDateTimeSmart } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function ComplaintsPage() {
   const { lang } = useLanguage();
@@ -156,7 +157,7 @@ export default function ComplaintsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{tr(lang, "complaints.table.ticketNumber")}</TableHead>
-                <TableHead>{tr(lang, "complaints.table.title")}</TableHead>
+                <TableHead>{tr(lang, "complaints.table.description")}</TableHead>
                 <TableHead>{tr(lang, "complaints.table.priority")}</TableHead>
                 <TableHead>{tr(lang, "complaints.table.status")}</TableHead>
                 <TableHead>{tr(lang, "complaints.table.assignedTeams")}</TableHead>
@@ -185,7 +186,23 @@ export default function ComplaintsPage() {
                 <TableRow key={t._id}>
                   <TableCell><Link className="underline" href={`/complaints/${t._id}`}>{t.ticketNumber ?? t._id}</Link></TableCell>
                   <TableCell>
-                    <span className="block max-w-[420px] truncate" title={t.title}>{t.title}</span>
+                    {t.description && t.description.length > 60 ? (
+                      <Tooltip delayDuration={200}>
+                        <TooltipTrigger asChild>
+                          <span className="block max-w-[420px] truncate cursor-help">{t.description}</span>
+                        </TooltipTrigger>
+                        <TooltipContent 
+                          side="top" 
+                          className="max-w-md p-4 text-sm bg-popover text-popover-foreground border shadow-lg rounded-lg"
+                          sideOffset={8}
+                        >
+                          <div className="font-medium mb-2 text-xs text-muted-foreground uppercase tracking-wide">Description</div>
+                          <div className="whitespace-pre-wrap break-words text-foreground leading-relaxed">{t.description}</div>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="block max-w-[420px] truncate">{t.description}</span>
+                    )}
                   </TableCell>
                   <TableCell className="capitalize">
                     {t.priority ? (

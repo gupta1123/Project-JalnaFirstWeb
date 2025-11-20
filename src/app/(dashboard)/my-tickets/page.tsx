@@ -23,6 +23,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function MyTicketsPage() {
   const { lang } = useLanguage();
@@ -328,11 +329,31 @@ export default function MyTicketsPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-[300px]">
-                        <p className="truncate" title={ticket.description}>
-                          {ticket.description}
-                        </p>
-                      </div>
+                      {ticket.description && ticket.description.length > 60 ? (
+                        <Tooltip delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <div className="max-w-[300px] cursor-help">
+                              <p className="truncate">{ticket.description}</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            sideOffset={8}
+                            className="max-w-md p-4 text-sm bg-popover text-popover-foreground border shadow-lg rounded-lg"
+                          >
+                            <div className="font-medium mb-2 text-xs text-muted-foreground uppercase tracking-wide">
+                              {tr(lang, "ticketDetail.description")}
+                            </div>
+                            <div className="whitespace-pre-wrap break-words leading-relaxed">
+                              {ticket.description}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <div className="max-w-[300px]">
+                          <p className="truncate">{ticket.description}</p>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {ticket.coordinates ? (
