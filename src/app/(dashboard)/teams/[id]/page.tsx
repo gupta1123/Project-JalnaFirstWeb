@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import useSWR from "swr";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,8 @@ import {
   getTeams,
   addEmployeesToTeam,
   updateTeamLeader,
+  adminGetTickets,
+  getTicketAttachments,
 } from "@/lib/api";
 import type { User, Team } from "@/lib/types";
 import { formatDateTimeSmart } from "@/lib/utils";
@@ -22,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -36,7 +38,13 @@ import {
   UserPlus,
   CheckCircle2,
   XCircle,
-  User as UserIcon
+  User as UserIcon,
+  FileText,
+  Image,
+  Video,
+  File,
+  Eye,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -210,10 +218,14 @@ export default function TeamDetailsPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             {tr(lang, "teamDetail.tabs.overview")}
+          </TabsTrigger>
+          <TabsTrigger value="attachments" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Attachments
           </TabsTrigger>
         </TabsList>
 
@@ -361,7 +373,10 @@ export default function TeamDetailsPage() {
           </div>
         </TabsContent>
 
-        {/* Activity tab removed */}
+        {/* Attachments Tab */}
+        <TabsContent value="attachments" className="space-y-6">
+          <TeamAttachmentsTab teamId={team._id} lang={lang} />
+        </TabsContent>
       </Tabs>
 
       {/* Add Member */}
@@ -587,6 +602,316 @@ function ChangeLeaderForm({ team, onSubmit, submitting, lang }: { team: Team; on
         <Button type="submit" disabled={submitting || !selectedLeader || selectedLeader === team.leaderId}>{submitting ? tr(lang, "teamDetail.changeLeader.updating") : tr(lang, "teamDetail.changeLeader.change")}</Button>
       </DialogFooter>
     </form>
+  );
+}
+
+function TeamAttachmentsTab({ teamId, lang }: { teamId: string; lang: "en" | "hi" | "mr" }) {
+  const [activeAttachmentsTab, setActiveAttachmentsTab] = useState<"user" | "team">("user");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+  } | null>(null);
+
+  type AttachmentItem = {
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+    publicId?: string;
+    uploadedByRole?: string;
+    uploadedBy?: {
+      _id?: string;
+      id?: string;
+      role?: string;
+      firstName?: string;
+      lastName?: string;
+      fullName?: string;
+      email?: string;
+    };
+    uploadedByName?: string;
+    uploadedAt?: string;
+    ticketId?: string;
+    ticketNumber?: string;
+  };
+
+  // Fetch all tickets (we'll filter by team client-side)
+  const { data: ticketsData, isLoading: loadingTickets } = useSWR(
+    ["admin-tickets-for-team", teamId],
+    () => adminGetTickets({ page: 1, limit: 1000 }),
+    { revalidateOnFocus: false }
+  );
+
+  // Filter tickets assigned to this team
+  const teamTickets = useMemo(() => {
+    if (!ticketsData?.tickets) return [];
+    return ticketsData.tickets.filter((ticket) =>
+      ticket.assignedTeams?.some((team) => {
+        const teamIdStr = (team as { _id?: string; id?: string })._id || (team as { _id?: string; id?: string }).id;
+        return teamIdStr === teamId;
+      })
+    );
+  }, [ticketsData, teamId]);
+
+  // Fetch attachments for all team tickets
+  const attachmentResults = useSWR(
+    teamTickets.length > 0 ? [`team-attachments-batch-${teamId}`, teamTickets.map(t => t._id).join(',')] : null,
+    async () => {
+      if (teamTickets.length === 0) return [];
+      const results = await Promise.all(
+        teamTickets.map(async (ticket) => {
+          try {
+            const attData = await getTicketAttachments(ticket._id);
+            return {
+              ticketId: ticket._id,
+              ticketNumber: ticket.ticketNumber,
+              attachments: (attData?.attachments || []).map((att) => ({
+                ...att,
+                ticketId: ticket._id,
+                ticketNumber: ticket.ticketNumber,
+              })),
+            };
+          } catch {
+            return {
+              ticketId: ticket._id,
+              ticketNumber: ticket.ticketNumber,
+              attachments: [],
+            };
+          }
+        })
+      );
+      return results;
+    },
+    { revalidateOnFocus: false }
+  );
+
+  const allAttachments: AttachmentItem[] = useMemo(() => {
+    if (!attachmentResults.data) return [];
+    return attachmentResults.data.flatMap((result) => result.attachments);
+  }, [attachmentResults.data]);
+
+  // Split attachments by uploadedByRole
+  const teamAttachments: AttachmentItem[] = allAttachments.filter((att) => {
+    if (att.uploadedByRole === "staff") return true;
+    if (att.uploadedBy?.role === "staff") return true;
+    return false;
+  });
+
+  const userAttachments: AttachmentItem[] = allAttachments.filter((att) => {
+    const isTeam = att.uploadedByRole === "staff" || att.uploadedBy?.role === "staff";
+    return !isTeam;
+  });
+
+  const hasUserAttachments = userAttachments.length > 0;
+  const hasTeamAttachments = teamAttachments.length > 0;
+
+  useEffect(() => {
+    if (!hasUserAttachments && hasTeamAttachments) {
+      setActiveAttachmentsTab("team");
+    } else if (hasUserAttachments && !hasTeamAttachments) {
+      setActiveAttachmentsTab("user");
+    }
+  }, [hasUserAttachments, hasTeamAttachments]);
+
+  const isImage = (m?: string) => Boolean(m && m.startsWith("image/"));
+  const isVideo = (m?: string) => Boolean(m && m.startsWith("video/"));
+  const isPdf = (m?: string) => m === "application/pdf";
+
+  const renderAttachmentGrid = (items: AttachmentItem[]) => {
+    if (!items.length) {
+      return (
+        <div className="text-xs text-muted-foreground text-center py-4">
+          No files in this section yet.
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+        {items.map((att) => (
+          <div
+            key={att._id}
+            className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md"
+          >
+            {/* Thumbnail/Icon */}
+            <div className="w-full h-full flex items-center justify-center">
+              {isImage(att.mimeType) ? (
+                <img src={att.url} alt={att.filename || "Attachment"} className="w-full h-full object-cover" />
+              ) : isVideo(att.mimeType) ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Video className="size-8" />
+                  <span className="text-xs font-medium">Video</span>
+                </div>
+              ) : isPdf(att.mimeType) ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <FileText className="size-8" />
+                  <span className="text-xs font-medium">PDF</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <File className="size-8" />
+                  <span className="text-xs font-medium">File</span>
+                </div>
+              )}
+            </div>
+
+            {/* Overlay Actions */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 hover:bg-white text-black border-0"
+                onClick={() => {
+                  setPreviewAttachment(att);
+                  setPreviewOpen(true);
+                }}
+              >
+                <Eye className="size-4" />
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 hover:bg-white text-black border-0"
+              >
+                <a href={att.url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="size-4" />
+                </a>
+              </Button>
+            </div>
+
+            {/* File size indicator */}
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {att.size < 1024
+                ? `${att.size} B`
+                : att.size < 1024 * 1024
+                ? `${Math.round(att.size / 1024)} KB`
+                : `${Math.round(att.size / (1024 * 1024))} MB`}
+            </div>
+
+            {/* Ticket number badge */}
+            {att.ticketNumber && (
+              <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                {att.ticketNumber}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  if (loadingTickets || attachmentResults.isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Attachments
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2">
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-3/4" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Attachments from Team Tickets ({allAttachments.length} total)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {allAttachments.length === 0 ? (
+            <div className="text-xs text-muted-foreground text-center py-4">
+              No attachments found for tickets assigned to this team.
+            </div>
+          ) : (
+            <Tabs
+              value={activeAttachmentsTab}
+              onValueChange={(value) => setActiveAttachmentsTab(value as "user" | "team")}
+              className="w-full"
+            >
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="user" className="flex-1">
+                  Citizen uploads ({userAttachments.length})
+                </TabsTrigger>
+                <TabsTrigger value="team" className="flex-1">
+                  Team proof ({teamAttachments.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="user" className="mt-3">
+                {renderAttachmentGrid(userAttachments)}
+              </TabsContent>
+
+              <TabsContent value="team" className="mt-3">
+                {renderAttachmentGrid(teamAttachments)}
+              </TabsContent>
+            </Tabs>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Attachment Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={(o) => { setPreviewOpen(o); if (!o) setPreviewAttachment(null); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewAttachment && isImage(previewAttachment.mimeType) && <Image className="size-5" />}
+              {previewAttachment && isVideo(previewAttachment.mimeType) && <Video className="size-5" />}
+              {previewAttachment && isPdf(previewAttachment.mimeType) && <FileText className="size-5" />}
+              {previewAttachment && !isImage(previewAttachment.mimeType) && !isVideo(previewAttachment.mimeType) && !isPdf(previewAttachment.mimeType) && <File className="size-5" />}
+              Preview
+            </DialogTitle>
+            {previewAttachment && (
+              <DialogDescription className="flex items-center justify-between">
+                <span>{previewAttachment.mimeType}</span>
+                <Button asChild size="sm" variant="outline">
+                  <a href={previewAttachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
+                    <ExternalLink className="size-3" />
+                    Open Original
+                  </a>
+                </Button>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="mt-4 flex items-center justify-center bg-muted/30 rounded-lg overflow-hidden" style={{ minHeight: '60vh' }}>
+            {previewAttachment ? (
+              isImage(previewAttachment.mimeType) ? (
+                <img src={previewAttachment.url} alt="Attachment" className="max-h-[60vh] max-w-full object-contain rounded" />
+              ) : isVideo(previewAttachment.mimeType) ? (
+                <video src={previewAttachment.url} controls className="max-h-[60vh] max-w-full rounded" />
+              ) : isPdf(previewAttachment.mimeType) ? (
+                <iframe src={previewAttachment.url} className="w-full h-[60vh] rounded border-0" />
+              ) : (
+                <div className="text-center py-12">
+                  <File className="size-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">
+                    Preview not available for this file type.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use &quot;Open Original&quot; to view the file.
+                  </p>
+                </div>
+              )
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

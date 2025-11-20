@@ -238,6 +238,9 @@ const messages: Record<Lang, Messages> = {
     "teamMembers.modal.toast.createSuccess": "Staff member created and added to team successfully",
     "teamMembers.modal.toast.createError": "Failed to create staff member",
     "teamMembers.modal.loadingStaff": "Loading staff data...",
+    "teamMembers.menu.view": "View",
+    "teamMembers.menu.edit": "Edit",
+    "teamMembers.menu.remove": "Remove",
 
     // Complaints list page (admin)
     "complaints.filters.searchPlaceholder": "Search title/description/number…",
@@ -1043,6 +1046,9 @@ const messages: Record<Lang, Messages> = {
     "teamMembers.modal.toast.createSuccess": "स्टाफ सदस्य सफलतापूर्वक बनाया और जोड़ा गया",
     "teamMembers.modal.toast.createError": "स्टाफ सदस्य बनाना असफल रहा",
     "teamMembers.modal.loadingStaff": "स्टाफ डेटा लोड हो रहा है...",
+    "teamMembers.menu.view": "देखें",
+    "teamMembers.menu.edit": "संपादित करें",
+    "teamMembers.menu.remove": "हटाएँ",
 
     // Complaints list page (admin)
     "complaints.filters.searchPlaceholder": "शीर्षक/विवरण/नंबर खोजें…",
@@ -1849,6 +1855,9 @@ const messages: Record<Lang, Messages> = {
     "teamMembers.modal.toast.createSuccess": "स्टाफ सदस्य तयार करून टीममध्ये जोडला",
     "teamMembers.modal.toast.createError": "स्टाफ सदस्य तयार करण्यात अयशस्वी",
     "teamMembers.modal.loadingStaff": "स्टाफ डेटा लोड होत आहे...",
+    "teamMembers.menu.view": "पहा",
+    "teamMembers.menu.edit": "संपादित करा",
+    "teamMembers.menu.remove": "काढून टाका",
 
     // Complaints list page (admin)
     "complaints.filters.searchPlaceholder": "शीर्षक/वर्णन/नंबर शोधा…",

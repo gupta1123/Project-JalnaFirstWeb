@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Complaint } from "@/lib/types";
 import { adminGetTickets } from "@/lib/api";
 import type { Ticket } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +20,56 @@ import { tr } from "@/lib/i18n";
 
 export default function ComplaintsPage() {
   const { lang } = useLanguage();
+
+  // Fixed categories & subcategories as configured in backend
+  const fixedCategories = [
+    {
+      name: "Public Safety",
+      subcategories: [
+        "Law and Order",
+        "Robbery and Theft",
+        "Accident",
+        "Stampede",
+        "Sound Pollution",
+      ],
+    },
+    {
+      name: "Infrastructure and Roads",
+      subcategories: [
+        "Potholes",
+        "Incomplete Roads",
+        "Streetlights",
+        "Encroachment",
+        "Tree Cutting",
+        "Black Spots",
+      ],
+    },
+    {
+      name: "Sanitation and Utilities",
+      subcategories: [
+        "Open Gutters and Manholes",
+        "Sewer Choke",
+        "Water Leakage or No Supply",
+        "Solid Waste Missed Pickup",
+        "Public Toilets",
+      ],
+    },
+    {
+      name: "Traffic and Transport",
+      subcategories: [
+        "Illegal Parking",
+        "Traffic Congestion",
+      ],
+    },
+    {
+      name: "Livelihood and Local Order",
+      subcategories: [
+        "Hawkers Non Designated",
+        "Stray Animals",
+      ],
+    },
+  ] as const;
+
   const [page, setPage] = useState(1);
   const [limit] = useState(15);
   const [search, setSearch] = useState("");
@@ -32,7 +81,12 @@ export default function ComplaintsPage() {
     const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
     if (search && search.trim()) p.search = search.trim();
     if (status && allowed.has(status)) p.status = status;
-    if (category && category !== "all") p.category = category;
+    if (category && category !== "all") {
+      // Backend expects category names without underscores in the query param.
+      // We keep the internal values (with underscores) for enums/translations,
+      // and only normalize when sending to the API.
+      p.category = category.replace(/_/g, " ");
+    }
     if (priority && priority !== "all") p.priority = priority;
     return p;
   }, [page, limit, search, status, category, priority]);
@@ -70,24 +124,18 @@ export default function ComplaintsPage() {
               </SelectContent>
             </Select>
             <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
-              <SelectTrigger className="w-[220px]"><SelectValue placeholder={tr(lang, "complaints.filters.category")} /></SelectTrigger>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={tr(lang, "complaints.filters.category")} />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{tr(lang, "complaints.filters.category.all")}</SelectItem>
-                <SelectItem value="sanitation">{tr(lang, "complaints.filters.category.sanitation")}</SelectItem>
-                <SelectItem value="water_supply">{tr(lang, "complaints.filters.category.waterSupply")}</SelectItem>
-                <SelectItem value="electricity">{tr(lang, "complaints.filters.category.electricity")}</SelectItem>
-                <SelectItem value="roads">{tr(lang, "complaints.filters.category.roads")}</SelectItem>
-                <SelectItem value="streetlights">{tr(lang, "complaints.filters.category.streetlights")}</SelectItem>
-                <SelectItem value="drainage">{tr(lang, "complaints.filters.category.drainage")}</SelectItem>
-                <SelectItem value="public_safety">{tr(lang, "complaints.filters.category.publicSafety")}</SelectItem>
-                <SelectItem value="healthcare">{tr(lang, "complaints.filters.category.healthcare")}</SelectItem>
-                <SelectItem value="education">{tr(lang, "complaints.filters.category.education")}</SelectItem>
-                <SelectItem value="transport">{tr(lang, "complaints.filters.category.transport")}</SelectItem>
-                <SelectItem value="municipal_services">{tr(lang, "complaints.filters.category.municipalServices")}</SelectItem>
-                <SelectItem value="pollution">{tr(lang, "complaints.filters.category.pollution")}</SelectItem>
-                <SelectItem value="encroachment">{tr(lang, "complaints.filters.category.encroachment")}</SelectItem>
-                <SelectItem value="property_tax_billing">{tr(lang, "complaints.filters.category.propertyTaxBilling")}</SelectItem>
-                <SelectItem value="other">{tr(lang, "complaints.filters.category.other")}</SelectItem>
+                <SelectItem value="all">
+                  {tr(lang, "complaints.filters.category.all")}
+                </SelectItem>
+                {fixedCategories.map((cat) => (
+                  <SelectItem key={cat.name} value={cat.name}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>

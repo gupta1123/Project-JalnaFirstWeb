@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -225,7 +225,29 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     });
 
   const ticket = data?.ticket as Ticket | undefined;
-  const attachments = attachmentsData?.attachments || [];
+
+  type AttachmentItem = {
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+    publicId?: string;
+    uploadedByRole?: string;
+    uploadedBy?: {
+      _id?: string;
+      id?: string;
+      role?: string;
+      firstName?: string;
+      lastName?: string;
+      fullName?: string;
+      email?: string;
+    };
+    uploadedByName?: string;
+    uploadedAt?: string;
+  };
+
+  const attachments = (attachmentsData?.attachments || []) as AttachmentItem[];
   const isClosed = !!ticket && ticket.status === 'closed';
   const assignedTeamCount = ticket?.assignedTeams?.length ?? 0;
   const primaryTeam = myTeamData?.team || myTeamData?.teams?.[0];
@@ -248,6 +270,121 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
 
   const canUpdateStatus = !!ticket && (isAssignedUser || isLeaderForTicketTeam);
   const canAssignMember = !!ticket && !ticket.assignedUser && isTeamLead;
+
+  // Split attachments into those uploaded by citizens vs team members (staff/team leads).
+  // Use the uploadedByRole field from the API to determine the category.
+  // If uploadedByRole is "staff" (or the uploadedBy user has role "staff"), it's a team upload.
+  // Otherwise, it's a citizen/user upload.
+  const teamAttachments: AttachmentItem[] = attachments.filter((att) => {
+    // Check uploadedByRole field first
+    if (att.uploadedByRole === "staff") return true;
+    // Fallback: check the uploadedBy user's role
+    if (att.uploadedBy?.role === "staff") return true;
+    return false;
+  });
+
+  const ticketUserAttachments: AttachmentItem[] = attachments.filter((att) => {
+    // If it's not a team attachment, it's a user attachment
+    const isTeam = att.uploadedByRole === "staff" || att.uploadedBy?.role === "staff";
+    return !isTeam;
+  });
+
+  const hasUserAttachments = ticketUserAttachments.length > 0;
+  const hasTeamAttachments = teamAttachments.length > 0;
+
+  const [activeAttachmentsTab, setActiveAttachmentsTab] = useState<"user" | "team">("user");
+
+  // Choose the most useful default tab based on which side has files
+  useEffect(() => {
+    if (!hasUserAttachments && hasTeamAttachments) {
+      setActiveAttachmentsTab("team");
+    } else if (hasUserAttachments && !hasTeamAttachments) {
+      setActiveAttachmentsTab("user");
+    }
+  }, [hasUserAttachments, hasTeamAttachments]);
+
+  const renderAttachmentGrid = (items: AttachmentItem[]) => {
+    if (!items.length) {
+      return (
+        <div className="text-xs text-muted-foreground text-center py-4">
+          No files in this section yet.
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3">
+        {items.map((att) => (
+          <div
+            key={att._id}
+            className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md"
+          >
+            {/* Thumbnail/Icon */}
+            <div className="w-full h-full flex items-center justify-center">
+              {isImage(att.mimeType) ? (
+                <img src={att.url} alt={att.filename || "Attachment"} className="w-full h-full object-cover" />
+              ) : isVideo(att.mimeType) ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <Video className="size-8" />
+                  <span className="text-xs font-medium">
+                    {tr(lang, "ticketDetail.fileType.video")}
+                  </span>
+                </div>
+              ) : isPdf(att.mimeType) ? (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <FileText className="size-8" />
+                  <span className="text-xs font-medium">
+                    {tr(lang, "ticketDetail.fileType.pdf")}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                  <File className="size-8" />
+                  <span className="text-xs font-medium">
+                    {tr(lang, "ticketDetail.fileType.file")}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Overlay Actions */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 hover:bg-white text-black border-0"
+                onClick={() => {
+                  setPreviewAttachment(att);
+                  setPreviewOpen(true);
+                }}
+              >
+                <Eye className="size-4" />
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 hover:bg-white text-black border-0"
+              >
+                <a href={att.url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="size-4" />
+                </a>
+              </Button>
+            </div>
+
+            {/* File size indicator */}
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+              {att.size < 1024
+                ? `${att.size} B`
+                : att.size < 1024 * 1024
+                ? `${Math.round(att.size / 1024)} KB`
+                : `${Math.round(att.size / (1024 * 1024))} MB`}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
 
   const handleStartWork = async () => {
@@ -280,7 +417,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
 
     try {
       setUpdatingStatus(true);
-      // 1) Upload proof attachment (image only)
+      // 1) Upload proof attachment (image only) - using "add" mode to append to existing attachments
       await uploadTicketAttachments(id, [proofFile], "add");
 
       // 2) Update status to resolved
@@ -1078,63 +1215,31 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   <Skeleton className="h-16 w-full" />
                   <Skeleton className="h-16 w-3/4" />
                 </div>
-              ) : attachments.length === 0 ? (
+              ) : attachments.length === 0 && !hasUserAttachments ? (
                 <div className="text-xs text-muted-foreground text-center py-4">{tr(lang, "ticketDetail.noAttachments")}</div>
               ) : (
-                <div className="grid gap-3">
-                  {attachments.map((att) => (
-                    <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
-                      {/* Thumbnail/Icon */}
-                      <div className="w-full h-full flex items-center justify-center">
-                        {isImage(att.mimeType) ? (
-                          <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
-                        ) : isVideo(att.mimeType) ? (
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <Video className="size-8" />
-                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.video")}</span>
-                          </div>
-                        ) : isPdf(att.mimeType) ? (
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <FileText className="size-8" />
-                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.pdf")}</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <File className="size-8" />
-                            <span className="text-xs font-medium">{tr(lang, "ticketDetail.fileType.file")}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Overlay Actions */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          className="bg-white/90 hover:bg-white text-black border-0"
-                          onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
-                        >
-                          <Eye className="size-4" />
-                        </Button>
-                        <Button 
-                          asChild 
-                          size="sm" 
-                          variant="secondary"
-                          className="bg-white/90 hover:bg-white text-black border-0"
-                        >
-                          <a href={att.url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="size-4" />
-                          </a>
-                        </Button>
-                      </div>
-                      
-                      {/* File size indicator */}
-                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                        {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Tabs
+                  value={activeAttachmentsTab}
+                  onValueChange={(value) => setActiveAttachmentsTab(value as "user" | "team")}
+                  className="w-full"
+                >
+                  <TabsList className="w-full justify-start">
+                    <TabsTrigger value="user" className="flex-1">
+                      Citizen uploads
+                    </TabsTrigger>
+                    <TabsTrigger value="team" className="flex-1">
+                      Team proof
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="user" className="mt-3">
+                    {renderAttachmentGrid(ticketUserAttachments)}
+                  </TabsContent>
+
+                  <TabsContent value="team" className="mt-3">
+                    {renderAttachmentGrid(teamAttachments)}
+                  </TabsContent>
+                </Tabs>
               )}
             </CardContent>
           </Card>

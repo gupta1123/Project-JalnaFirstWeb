@@ -11,7 +11,7 @@ import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, Ext
 import { formatDateTimeSmart } from "@/lib/utils";
 import type { Ticket, TicketStatus, User, ChangedBy } from "@/lib/types";
 import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments } from "@/lib/api";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -128,7 +128,60 @@ export default function ComplaintDetailPage() {
     () => getTicketAttachments(id),
     { revalidateOnFocus: false }
   );
-  const attachments = attachmentsResp?.attachments ?? [] as Array<{ _id: string; filename: string; url: string; size: number; mimeType: string; }>;
+
+  type AttachmentItem = {
+    _id: string;
+    filename: string;
+    url: string;
+    size: number;
+    mimeType: string;
+    publicId?: string;
+    uploadedByRole?: string;
+    uploadedBy?: {
+      _id?: string;
+      id?: string;
+      role?: string;
+      firstName?: string;
+      lastName?: string;
+      fullName?: string;
+      email?: string;
+    };
+    uploadedByName?: string;
+    uploadedAt?: string;
+  };
+
+  const allAttachments = (attachmentsResp?.attachments ?? []) as AttachmentItem[];
+
+  // Split attachments by uploadedByRole
+  const userAttachments: AttachmentItem[] = allAttachments.filter((att) => {
+    // Citizen uploads: role is "user" or not staff
+    if (att.uploadedByRole === "user") return true;
+    if (att.uploadedBy?.role === "user") return true;
+    // If no role info, assume it's a user upload (from ticket creation)
+    if (!att.uploadedByRole && !att.uploadedBy?.role) return true;
+    return false;
+  });
+
+  const teamAttachments: AttachmentItem[] = allAttachments.filter((att) => {
+    // Team proof: role is "staff"
+    if (att.uploadedByRole === "staff") return true;
+    if (att.uploadedBy?.role === "staff") return true;
+    return false;
+  });
+
+  const hasUserAttachments = userAttachments.length > 0;
+  const hasTeamAttachments = teamAttachments.length > 0;
+
+  const [activeAttachmentsTab, setActiveAttachmentsTab] = useState<"user" | "team">("user");
+
+  // Choose the most useful default tab based on which side has files
+  useEffect(() => {
+    if (!hasUserAttachments && hasTeamAttachments) {
+      setActiveAttachmentsTab("team");
+    } else if (hasUserAttachments && !hasTeamAttachments) {
+      setActiveAttachmentsTab("user");
+    }
+  }, [hasUserAttachments, hasTeamAttachments]);
 
 
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -443,63 +496,149 @@ export default function ComplaintDetailPage() {
                             <Skeleton className="h-16 w-full" />
                             <Skeleton className="h-16 w-3/4" />
                           </div>
-                        ) : attachments.length === 0 ? (
+                        ) : allAttachments.length === 0 ? (
                           <div className="text-xs text-muted-foreground">{tr(lang, "complaintDetail.noAttachments")}</div>
                         ) : (
-                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {attachments.map((att) => (
-                              <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
-                                {/* Thumbnail/Icon */}
-                                <div className="w-full h-full flex items-center justify-center">
-                                  {isImage(att.mimeType) ? (
-                                    <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
-                                  ) : isVideo(att.mimeType) ? (
-                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                      <Video className="size-12" />
-                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.video")}</span>
-                                    </div>
-                                  ) : isPdf(att.mimeType) ? (
-                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                      <FileText className="size-12" />
-                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.pdf")}</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                      <File className="size-12" />
-                                      <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.file")}</span>
-                                    </div>
-                                  )}
+                          <Tabs
+                            value={activeAttachmentsTab}
+                            onValueChange={(value) => setActiveAttachmentsTab(value as "user" | "team")}
+                            className="w-full"
+                          >
+                            <TabsList className="w-full justify-start">
+                              <TabsTrigger value="user" className="flex-1">
+                                Citizen uploads ({userAttachments.length})
+                              </TabsTrigger>
+                              <TabsTrigger value="team" className="flex-1">
+                                Team proof ({teamAttachments.length})
+                              </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="user" className="mt-3">
+                              {userAttachments.length === 0 ? (
+                                <div className="text-xs text-muted-foreground text-center py-4">
+                                  No files in this section yet.
                                 </div>
-                                
-                                {/* Overlay Actions */}
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="secondary" 
-                                    className="bg-white/90 hover:bg-white text-black border-0"
-                                    onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
-                                  >
-                                    <Eye className="size-4" />
-                                  </Button>
-                                  <Button 
-                                    asChild 
-                                    size="sm" 
-                                    variant="secondary"
-                                    className="bg-white/90 hover:bg-white text-black border-0"
-                                  >
-                                    <a href={att.url} target="_blank" rel="noopener noreferrer">
-                                      <ExternalLink className="size-4" />
-                                    </a>
-                                  </Button>
+                              ) : (
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                  {userAttachments.map((att) => (
+                                    <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
+                                      {/* Thumbnail/Icon */}
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        {isImage(att.mimeType) ? (
+                                          <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                                        ) : isVideo(att.mimeType) ? (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <Video className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.video")}</span>
+                                          </div>
+                                        ) : isPdf(att.mimeType) ? (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <FileText className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.pdf")}</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <File className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.file")}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Overlay Actions */}
+                                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                                        <Button 
+                                          size="sm" 
+                                          variant="secondary" 
+                                          className="bg-white/90 hover:bg-white text-black border-0"
+                                          onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
+                                        >
+                                          <Eye className="size-4" />
+                                        </Button>
+                                        <Button 
+                                          asChild 
+                                          size="sm" 
+                                          variant="secondary"
+                                          className="bg-white/90 hover:bg-white text-black border-0"
+                                        >
+                                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="size-4" />
+                                          </a>
+                                        </Button>
+                                      </div>
+                                      
+                                      {/* File size indicator */}
+                                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                        {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                                
-                                {/* File size indicator */}
-                                <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                                  {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                              )}
+                            </TabsContent>
+
+                            <TabsContent value="team" className="mt-3">
+                              {teamAttachments.length === 0 ? (
+                                <div className="text-xs text-muted-foreground text-center py-4">
+                                  No files in this section yet.
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+                              ) : (
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                  {teamAttachments.map((att) => (
+                                    <div key={att._id} className="group relative aspect-square rounded-lg border overflow-hidden bg-muted/30 hover:bg-muted/50 transition-all duration-200 hover:shadow-md">
+                                      {/* Thumbnail/Icon */}
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        {isImage(att.mimeType) ? (
+                                          <img src={att.url} alt="Attachment" className="w-full h-full object-cover" />
+                                        ) : isVideo(att.mimeType) ? (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <Video className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.video")}</span>
+                                          </div>
+                                        ) : isPdf(att.mimeType) ? (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <FileText className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.pdf")}</span>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                            <File className="size-12" />
+                                            <span className="text-xs font-medium">{tr(lang, "complaintDetail.fileType.file")}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Overlay Actions */}
+                                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                                        <Button 
+                                          size="sm" 
+                                          variant="secondary" 
+                                          className="bg-white/90 hover:bg-white text-black border-0"
+                                          onClick={() => { setPreviewAttachment(att); setPreviewOpen(true); }}
+                                        >
+                                          <Eye className="size-4" />
+                                        </Button>
+                                        <Button 
+                                          asChild 
+                                          size="sm" 
+                                          variant="secondary"
+                                          className="bg-white/90 hover:bg-white text-black border-0"
+                                        >
+                                          <a href={att.url} target="_blank" rel="noopener noreferrer">
+                                            <ExternalLink className="size-4" />
+                                          </a>
+                                        </Button>
+                                      </div>
+                                      
+                                      {/* File size indicator */}
+                                      <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                                        {att.size < 1024 ? `${att.size} B` : att.size < 1024 * 1024 ? `${Math.round(att.size / 1024)} KB` : `${Math.round(att.size / (1024 * 1024))} MB`}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </TabsContent>
+                          </Tabs>
                         )}
                       </TabsContent>
                     </Tabs>

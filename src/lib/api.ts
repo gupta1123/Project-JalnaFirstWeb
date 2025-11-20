@@ -675,6 +675,18 @@ export async function getTicketAttachments(ticketId: string) {
       size: number;
       mimeType: string;
       _id: string;
+      uploadedByRole?: string;
+      uploadedBy?: {
+        _id?: string;
+        id?: string;
+        role?: string;
+        firstName?: string;
+        lastName?: string;
+        fullName?: string;
+        email?: string;
+      };
+      uploadedByName?: string;
+      uploadedAt?: string;
     }>;
   };
 }
