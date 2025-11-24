@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,29 +24,32 @@ import { tr } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { User } from "@/lib/types";
 
 export default function MyTicketsPage() {
   const { lang } = useLanguage();
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>("open");
+  const [status, setStatus] = useState<string>("assigned");
   const [assignContext, setAssignContext] = useState<{ ticketIds: string[]; description?: string } | null>(null);
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
 
+  const { data: currentUser } = useSWR("current-user", getCurrentUser, { revalidateOnFocus: false });
+  const isTeamLead = currentUser?.teams?.some((t) => t.isLeader) ?? false;
+
+  const statusFilterParam = status === "all" ? undefined : status;
   const { data, isLoading, mutate } = useSWR(
-    ["team-tickets", status, search],
+    ["team-tickets", statusFilterParam ?? "all", search],
     () =>
       getTeamTicketsMinimal({
         page: 1,
         limit: 50,
-        status: status === "all" ? undefined : status,
+        status: statusFilterParam,
         search: search || undefined,
       }),
     { revalidateOnFocus: false }
   );
-
-  const { data: currentUser } = useSWR("current-user", getCurrentUser, { revalidateOnFocus: false });
 
   const swrTickets = data?.tickets;
   const tickets = swrTickets ?? [];
@@ -54,7 +57,6 @@ export default function MyTicketsPage() {
   const currentUserId =
     (currentUser as { id?: string; _id?: string } | undefined)?.id ||
     (currentUser as { id?: string; _id?: string } | undefined)?._id;
-  const isTeamLead = currentUser?.teams?.some((t) => t.isLeader) ?? false;
   const leaderTeamId =
     currentUser?.teams?.find((t) => t.isLeader)?.id ?? currentUser?.teams?.[0]?.id;
 
@@ -125,13 +127,27 @@ export default function MyTicketsPage() {
     }
   };
 
-  // Filter tickets by search term and status
-  const filteredTickets = tickets.filter(ticket => {
+  const visibleTickets = useMemo(() => {
+    if (isTeamLead || !currentUserId) return tickets;
+    return tickets.filter((ticket) => {
+      const assigned = ticket.assignedUser;
+      if (!assigned) return false;
+      if (typeof assigned === "string") return assigned === currentUserId;
+
+      const assignedRecord = assigned as Partial<User> & { id?: string };
+      const assignedId = assignedRecord._id ?? assignedRecord.id;
+      return assignedId === currentUserId;
+    });
+  }, [tickets, isTeamLead, currentUserId]);
+
+  const filteredTickets = visibleTickets.filter(ticket => {
     const matchesSearch =
       search === "" || ticket.description.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = status === "all" || ticket.status === status;
     return matchesSearch && matchesStatus;
   });
+
+  const statsTickets = isTeamLead ? tickets : visibleTickets;
 
   return (
     <div className="space-y-6">
@@ -144,7 +160,7 @@ export default function MyTicketsPage() {
             <AlertCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tickets.length}</div>
+            <div className="text-2xl font-bold">{statsTickets.length}</div>
             <p className="text-xs text-muted-foreground">
               {tr(lang, "teamTickets.stats.total.helper")}
             </p>
@@ -157,7 +173,7 @@ export default function MyTicketsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {tickets.filter(t => t.status === "open").length}
+              {statsTickets.filter(t => t.status === "open").length}
             </div>
             <p className="text-xs text-muted-foreground">
               {tr(lang, "teamTickets.stats.open.helper")}
@@ -171,7 +187,7 @@ export default function MyTicketsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {tickets.filter(t => t.status === "in_progress").length}
+              {statsTickets.filter(t => t.status === "in_progress").length}
             </div>
             <p className="text-xs text-muted-foreground">
               {tr(lang, "teamTickets.stats.inProgress.helper")}
@@ -185,7 +201,7 @@ export default function MyTicketsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {tickets.filter(t => t.status === "resolved" || t.status === "closed").length}
+              {statsTickets.filter(t => t.status === "resolved" || t.status === "closed").length}
             </div>
             <p className="text-xs text-muted-foreground">
               {tr(lang, "teamTickets.stats.completed.helper")}
@@ -214,20 +230,11 @@ export default function MyTicketsPage() {
                   <SelectItem value="all">
                     {tr(lang, "teamTickets.filters.status.all")}
                   </SelectItem>
-                  <SelectItem value="open">
-                    {tr(lang, "teamTickets.filters.status.open")}
-                  </SelectItem>
                   <SelectItem value="assigned">
                     {tr(lang, "teamTickets.filters.status.assigned")}
                   </SelectItem>
                   <SelectItem value="in_progress">
                     {tr(lang, "teamTickets.filters.status.inProgress")}
-                  </SelectItem>
-                  <SelectItem value="pending_user">
-                    {tr(lang, "teamTickets.filters.status.pendingUser")}
-                  </SelectItem>
-                  <SelectItem value="pending_admin">
-                    {tr(lang, "teamTickets.filters.status.pendingAdmin")}
                   </SelectItem>
                   <SelectItem value="resolved">
                     {tr(lang, "teamTickets.filters.status.resolved")}
@@ -286,7 +293,7 @@ export default function MyTicketsPage() {
                 {!isLoading && filteredTickets.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8">
-                      {tickets.length === 0 ? (
+                      {statsTickets.length === 0 ? (
                         <div className="space-y-2">
                           <AlertCircle className="size-12 text-muted-foreground mx-auto" />
                           <h3 className="text-lg font-medium">{tr(lang, "teamTickets.empty.none")}</h3>

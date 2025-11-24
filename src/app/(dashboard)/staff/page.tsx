@@ -57,11 +57,47 @@ export default function StaffPage() {
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const queryKey = useMemo(() => ["staff", { page, limit, search }], [page, limit, search]);
-  const { data, isLoading, mutate } = useSWR(queryKey, () => getStaff({ page, limit, search: search || undefined }), { revalidateOnFocus: false });
+  const queryKey = useMemo(() => ["staff-all", { search }], [search]);
+  const fetchAllStaff = async () => {
+    const perPage = 100;
+    let pageCursor = 1;
+    let totalPages = 1;
+    const collected: User[] = [];
 
-  const staff: User[] = data?.staff ?? [];
-  const pagination = data?.pagination;
+    do {
+      const res = await getStaff({ page: pageCursor, limit: perPage, search: search || undefined });
+      if (res?.staff?.length) {
+        collected.push(...res.staff);
+      }
+      totalPages = res?.pagination?.totalPages ?? totalPages;
+      pageCursor += 1;
+      if (!res?.pagination) break;
+    } while (pageCursor <= totalPages);
+
+    return { staff: collected };
+  };
+
+  const { data, isLoading, mutate } = useSWR(queryKey, fetchAllStaff, { revalidateOnFocus: false });
+
+  const sortedStaff: User[] = useMemo(() => {
+    const list = data?.staff ?? [];
+    return [...list].sort((a, b) => {
+      const nameA = (a.fullName ?? `${a.firstName ?? ""} ${a.lastName ?? ""}`).trim().toLowerCase();
+      const nameB = (b.fullName ?? `${b.firstName ?? ""} ${b.lastName ?? ""}`).trim().toLowerCase();
+      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return 0;
+    });
+  }, [data?.staff]);
+
+  const totalStaff = sortedStaff.length;
+  const totalPages = Math.max(1, Math.ceil(totalStaff / limit));
+  const currentPage = Math.min(page, totalPages);
+  const visibleStaff = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return sortedStaff.slice(start, start + limit);
+  }, [sortedStaff, currentPage, limit]);
 
   const [pwdTarget, setPwdTarget] = useState<User | null>(null);
 
@@ -124,12 +160,12 @@ export default function StaffPage() {
                     ))}
                   </>
                 )}
-                {!isLoading && staff.length === 0 && (
+                {!isLoading && sortedStaff.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6}>{tr(lang, "staff.empty.none")}</TableCell>
                   </TableRow>
                 )}
-                {staff.map((s) => (
+                {visibleStaff.map((s) => (
                   <TableRow key={s._id}>
                     <TableCell>{s.fullName ?? `${s.firstName} ${s.lastName}`}</TableCell>
                     <TableCell>{s.email}</TableCell>
@@ -189,15 +225,34 @@ export default function StaffPage() {
             </Table>
           </div>
 
-          {pagination && (
-            <div className="flex items-center justify-between text-sm">
-              <div>{tr(lang, "staff.pagination.page")} {pagination.currentPage} {tr(lang, "staff.pagination.of")} {pagination.totalPages}</div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={pagination.currentPage <= 1}>{tr(lang, "staff.pagination.previous")}</Button>
-                <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={pagination.currentPage >= pagination.totalPages}>{tr(lang, "staff.pagination.next")}</Button>
-              </div>
+          <div className="flex items-center justify-between text-sm">
+            <div>
+              {tr(lang, "staff.pagination.page")} {currentPage} {tr(lang, "staff.pagination.of")} {totalPages}
+              {" "}
+              ({totalStaff} {tr(lang, "staff.pagination.total")})
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+              >
+                {tr(lang, "staff.pagination.previous")}
+              </Button>
+              <span>
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                {tr(lang, "staff.pagination.next")}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

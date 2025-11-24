@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useMemo, useRef, use } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   MapPin,
@@ -35,6 +34,7 @@ import {
   Video,
   File,
   Play,
+  Plus,
   X
 } from "lucide-react";
 import {
@@ -52,62 +52,14 @@ import {
   getTeamById,
 } from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
-import { Ticket, User, ChangedBy } from "@/lib/types";
+import { Ticket, User } from "@/lib/types";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 
+type ProofAttachment = { id: string; file: File; previewUrl: string; name: string };
+
 // Fetcher function for SWR
 const fetcher = (url: string) => api.get(url).then(res => res.data);
-
-// Helper function to format role display
-const formatUserRole = (user: ChangedBy | User, lang: "en" | "hi" | "mr") => {
-  if (!user) return '';
-
-  // Check for admin role
-  if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
-    return tr(lang, "ticketDetail.role.admin");
-  }
-
-  // Check for team leader (staff with isTeamLeader: true)
-  if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
-    return tr(lang, "ticketDetail.role.teamLead");
-  }
-
-  // Check for staff
-  if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
-    return tr(lang, "ticketDetail.role.staff");
-  }
-
-  // Check for team leader display role
-  if ('displayRole' in user && user.displayRole === 'team_leader') {
-    return tr(lang, "ticketDetail.role.teamLead");
-  }
-
-  return '';
-};
-
-// Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | ChangedBy, lang: "en" | "hi" | "mr") => {
-  if (!changedBy) return tr(lang, "ticketDetail.unknownUser");
-
-  if (typeof changedBy === 'string') return changedBy;
-
-  // Handle User type with role information
-  const userRole = formatUserRole(changedBy, lang);
-  const userName = changedBy.fullName ||
-    (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
-    changedBy.email ||
-    ('name' in changedBy ? changedBy.name : undefined); // Fallback to name field from API
-
-  if (userName && userRole) {
-    return `${userName} (${userRole})`;
-  }
-
-  // Fallback to name only if available
-  if (userName) return userName;
-
-  return tr(lang, "ticketDetail.unknownUser");
-};
 
 // Status badge helper function
 const getStatusBadge = (status: string | undefined) => {
@@ -150,10 +102,17 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [assigning, setAssigning] = useState(false);
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofFileName, setProofFileName] = useState<string>("");
-  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [proofFiles, setProofFiles] = useState<ProofAttachment[]>([]);
   const [proofInputKey, setProofInputKey] = useState(0);
+  const proofFilesRef = useRef<ProofAttachment[]>([]);
+  useEffect(() => {
+    proofFilesRef.current = proofFiles;
+  }, [proofFiles]);
+  useEffect(() => {
+    return () => {
+      proofFilesRef.current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    };
+  }, []);
   const [assignMemberOpen, setAssignMemberOpen] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [assigningMember, setAssigningMember] = useState(false);
@@ -410,15 +369,23 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const handleMarkResolved = async () => {
     if (!ticket) return;
 
-    if (!proofFile) {
+    if (proofFiles.length === 0) {
       toast.error(tr(lang, "ticketDetail.pleaseUploadPhoto"));
+      return;
+    }
+    if (proofFiles.length > 3) {
+      toast.error(tr(lang, "ticketDetail.maxProofReached"));
       return;
     }
 
     try {
       setUpdatingStatus(true);
       // 1) Upload proof attachment (image only) - using "add" mode to append to existing attachments
-      await uploadTicketAttachments(id, [proofFile], "add");
+      await uploadTicketAttachments(
+        id,
+        proofFiles.map((item) => item.file),
+        "add"
+      );
 
       // 2) Update status to resolved
       await updateTicketStatusTeam(id, {
@@ -429,12 +396,9 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
       mutate(); // Refresh the ticket data
       mutateAttachments(); // Refresh attachments list
       setResolutionNote("");
-      setProofFile(null);
-      setProofFileName("");
-      if (proofPreviewUrl) {
-        URL.revokeObjectURL(proofPreviewUrl);
-        setProofPreviewUrl(null);
-      }
+      proofFiles.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+      setProofFiles([]);
+      setProofInputKey((k) => k + 1);
     } catch (error: unknown) {
       console.error("Failed to mark as resolved:", error);
       toast.error(
@@ -749,11 +713,6 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                                 )}
                               </div>
                               
-                              {h.changedBy && (
-                                <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
-                                  {tr(lang, "ticketDetail.changedBy")}: {formatChangedBy(h.changedBy, lang)}
-                                </div>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -816,9 +775,6 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                             {note.addedAt && (
                               <div className="opacity-70 mt-1">
                                 {formatDateTimeSmart(note.addedAt)}
-                                {note.addedBy && (
-                                  <span> • by {formatChangedBy(note.addedBy, lang)}</span>
-                                )}
                               </div>
                             )}
                           </div>
@@ -894,102 +850,75 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
 
                 {ticket?.status === "in_progress" && canUpdateStatus && (
                   <>
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium flex items-center gap-2">
-                        <Image className="size-3 text-muted-foreground" />
-                        {tr(lang, "ticketDetail.completionPhoto")}
-                      </label>
-                      <div className="relative">
-                        <Input
-                          key={proofInputKey}
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) {
-                              setProofFile(null);
-                              setProofFileName("");
-                              if (proofPreviewUrl) {
-                                URL.revokeObjectURL(proofPreviewUrl);
-                                setProofPreviewUrl(null);
-                              }
-                              setProofInputKey((k) => k + 1);
-                              return;
-                            }
-                            if (!file.type.startsWith("image/")) {
-                              toast.error(tr(lang, "ticketDetail.pleaseUploadImage"));
-                              setProofFile(null);
-                              setProofFileName("");
-                              if (proofPreviewUrl) {
-                                URL.revokeObjectURL(proofPreviewUrl);
-                                setProofPreviewUrl(null);
-                              }
-                              setProofInputKey((k) => k + 1);
-                              return;
-                            }
-                            setProofFile(file);
-                            setProofFileName(file.name);
-                            if (proofPreviewUrl) {
-                              URL.revokeObjectURL(proofPreviewUrl);
-                            }
-                            const url = URL.createObjectURL(file);
-                            setProofPreviewUrl(url);
-                          }}
-                          className="sr-only"
-                          id={`file-input-${proofInputKey}`}
-                        />
-                        <label
-                          htmlFor={`file-input-${proofInputKey}`}
-                          className="flex h-9 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <span className="text-muted-foreground">
-                            {proofFileName || tr(lang, "ticketDetail.noFileChosen")}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 shrink-0"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              document.getElementById(`file-input-${proofInputKey}`)?.click();
-                            }}
-                          >
-                            {tr(lang, "ticketDetail.chooseFile")}
-                          </Button>
-                        </label>
-                      </div>
-                      {proofPreviewUrl && (
-                        <div className="mt-3 relative h-24 w-full overflow-hidden rounded-lg border bg-muted/40">
-                          <img
-                            src={proofPreviewUrl}
-                            alt={proofFileName || tr(lang, "ticketDetail.completionProofPreview")}
-                            className="h-full w-full object-cover"
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="absolute top-1 right-1 h-7 w-7 bg-background/70 hover:bg-background"
-                            onClick={() => {
-                              if (proofPreviewUrl) {
-                                URL.revokeObjectURL(proofPreviewUrl);
-                              }
-                              setProofPreviewUrl(null);
-                              setProofFile(null);
-                              setProofFileName("");
-                              setProofInputKey((k) => k + 1);
-                            }}
-                          >
-                            <X className="size-3" />
-                          </Button>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Image className="size-3 text-muted-foreground" />
+                          {tr(lang, "ticketDetail.completionPhoto")}
                         </div>
-                      )}
+                        <span>{tr(lang, "ticketDetail.proofUploadHint")}</span>
+                      </div>
+                      <input
+                        key={proofInputKey}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        id={`file-input-${proofInputKey}`}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) {
+                            setProofInputKey((k) => k + 1);
+                            return;
+                          }
+                          if (!file.type.startsWith("image/")) {
+                            toast.error(tr(lang, "ticketDetail.pleaseUploadImage"));
+                            setProofInputKey((k) => k + 1);
+                            return;
+                          }
+                          if (proofFiles.length >= 3) {
+                            toast.error(tr(lang, "ticketDetail.maxProofReached"));
+                            setProofInputKey((k) => k + 1);
+                            return;
+                          }
+                          const previewUrl = URL.createObjectURL(file);
+                          const id = `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                          setProofFiles((prev) => [...prev, { id, file, previewUrl, name: file.name }]);
+                          setProofInputKey((k) => k + 1);
+                        }}
+                      />
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {proofFiles.map((item) => (
+                          <div key={item.id} className="relative h-24 overflow-hidden rounded-lg border bg-muted/40">
+                            <img src={item.previewUrl} alt={item.name} className="h-full w-full object-cover" />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="secondary"
+                              className="absolute top-1 right-1 h-7 w-7"
+                              onClick={() => {
+                                URL.revokeObjectURL(item.previewUrl);
+                                setProofFiles((prev) => prev.filter((attachment) => attachment.id !== item.id));
+                              }}
+                            >
+                              <X className="size-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        {proofFiles.length < 3 && (
+                          <label
+                            htmlFor={`file-input-${proofInputKey}`}
+                            className="flex h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/50 text-xs text-muted-foreground transition hover:border-muted-foreground hover:text-foreground"
+                          >
+                            <Plus className="size-4" />
+                            {tr(lang, "ticketDetail.addProofPhoto")}
+                          </label>
+                        )}
+                      </div>
                     </div>
 
                     <Button 
                       onClick={handleMarkResolved}
-                      disabled={updatingStatus || isClosed || !proofFile}
+                      disabled={updatingStatus || isClosed || proofFiles.length === 0}
                       className="w-full h-9"
                       size="sm"
                       variant="default"

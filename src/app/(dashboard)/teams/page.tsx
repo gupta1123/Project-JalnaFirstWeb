@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   getTeams,
   getStaff,
@@ -68,14 +68,34 @@ import { tr } from "@/lib/i18n";
 export default function TeamsPage() {
   const { lang } = useLanguage();
   const [search, setSearch] = useState("");
-  // const [isViewOpen, setIsViewOpen] = useState<null | string>(null);
+  const [page, setPage] = useState(1);
+  const limit = 20;
   const [isEditMemberOpen, setIsEditMemberOpen] = useState<null | {teamId: string, member: User}>(null);
   const [isChangeLeaderOpen, setIsChangeLeaderOpen] = useState<null | string>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const fetchAllTeams = async () => {
+    const perPage = 100;
+    let pageCursor = 1;
+    let totalPages = 1;
+    const collected: Team[] = [];
+
+    do {
+      const res = await getTeams({ search, page: pageCursor, limit: perPage });
+      if (res?.teams?.length) {
+        collected.push(...res.teams);
+      }
+      totalPages = res?.pagination?.totalPages ?? totalPages;
+      pageCursor += 1;
+      if (!res?.pagination) break;
+    } while (pageCursor <= totalPages);
+
+    return { teams: collected };
+  };
+
   const { data, isLoading, mutate } = useSWR(
     ["teams", search],
-    async () => await getTeams({ search, page: 1, limit: 20 }),
+    fetchAllTeams,
     { revalidateOnFocus: false }
   );
 
@@ -85,19 +105,42 @@ export default function TeamsPage() {
     { revalidateOnFocus: false }
   );
 
-  const teams: Team[] = data?.teams ?? [];
   const allStaff: User[] = staffData?.staff ?? [];
+
+  const sortedTeams: Team[] = useMemo(() => {
+    const list = data?.teams ?? [];
+    return [...list].sort((a, b) => {
+      const nameA = (a.name ?? "").trim().toLowerCase();
+      const nameB = (b.name ?? "").trim().toLowerCase();
+      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return 0;
+    });
+  }, [data?.teams]);
+
+  const totalTeams = sortedTeams.length;
+  const totalPages = Math.max(1, Math.ceil(totalTeams / limit));
+  const currentPage = Math.min(page, totalPages);
+  const teams = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return sortedTeams.slice(start, start + limit);
+  }, [sortedTeams, currentPage, limit]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const teamById = useMemo(() => {
     const map = new Map<string, Team>();
-    teams.forEach((t) => map.set(t._id, t));
+    sortedTeams.forEach((t) => map.set(t._id, t));
     return map;
-  }, [teams]);
+  }, [sortedTeams]);
 
   // Staff already assigned to any team (used to filter Add Member options)
   const assignedStaffIds = useMemo(() => {
     const ids = new Set<string>();
-    teams.forEach((t) => t.employees.forEach((e) => ids.add(e._id)));
+    sortedTeams.forEach((t) => t.employees.forEach((e) => ids.add(e._id)));
     return ids;
   }, [teams]);
 
@@ -207,7 +250,7 @@ export default function TeamsPage() {
                     ))}
                   </>
                 )}
-                {!isLoading && teams.length === 0 && (
+                {!isLoading && sortedTeams.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5}>{tr(lang, "teams.empty.none")}</TableCell>
                   </TableRow>
@@ -269,6 +312,35 @@ export default function TeamsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex items-center justify-between text-sm">
+        <div>
+          {tr(lang, "teams.pagination.page")} {currentPage} {tr(lang, "teams.pagination.of")} {totalPages}
+          {" "}
+          ({totalTeams} {tr(lang, "teams.pagination.total")})
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage <= 1}
+          >
+            {tr(lang, "teams.pagination.previous")}
+          </Button>
+          <span>
+            {currentPage} / {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage >= totalPages}
+          >
+            {tr(lang, "teams.pagination.next")}
+          </Button>
+        </div>
+      </div>
 
       {/* View moved to dedicated page at /teams/[id] */}
 

@@ -145,7 +145,7 @@ export default function ComplaintsPage() {
             <Input className="w-full sm:w-[360px]" placeholder={tr(lang, "complaints.filters.searchPlaceholder")} value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
             <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
               <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.status")} /></SelectTrigger>
-              <SelectContent>
+              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
                 <SelectItem value="all">{tr(lang, "complaints.filters.status.all")}</SelectItem>
                 <SelectItem value="open">{tr(lang, "complaints.filters.status.open")}</SelectItem>
                 <SelectItem value="in_progress">{tr(lang, "complaints.filters.status.inProgress")}</SelectItem>
@@ -158,7 +158,7 @@ export default function ComplaintsPage() {
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder={tr(lang, "complaints.filters.category")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
                 <SelectItem value="all">
                   {tr(lang, "complaints.filters.category.all")}
                 </SelectItem>
@@ -171,7 +171,7 @@ export default function ComplaintsPage() {
             </Select>
             <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
               <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.priority")} /></SelectTrigger>
-              <SelectContent>
+              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
                 <SelectItem value="all">{tr(lang, "complaints.filters.priority.all")}</SelectItem>
                 <SelectItem value="low">{tr(lang, "complaints.filters.priority.low")}</SelectItem>
                 <SelectItem value="medium">{tr(lang, "complaints.filters.priority.medium")}</SelectItem>

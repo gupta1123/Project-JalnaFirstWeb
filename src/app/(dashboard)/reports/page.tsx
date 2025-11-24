@@ -14,7 +14,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { tr, type Lang } from "@/lib/i18n";
 import { getCurrentUser, getAdminTeamStats } from "@/lib/api";
 import type { AdminTeamStatsResponse, TicketStatusTotals, TeamMemberStat } from "@/lib/types";
-import { AlertCircle, BarChart3, CalendarRange, RefreshCw, TrendingUp, Users, Activity, CheckCircle2, FileText } from "lucide-react";
+import { AlertCircle, BarChart3, RefreshCw, TrendingUp, Activity, CheckCircle2, FileText, MapPin } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -71,6 +71,16 @@ const STATUS_KEYS = ["open", "assigned", "in_progress", "resolved", "closed"] as
 type StatusKey = typeof STATUS_KEYS[number];
 type StatusSummary = Record<StatusKey, number>;
 
+const TICKET_TOTAL_FIELDS: Array<keyof TicketStatusTotals> = [
+  "open",
+  "assigned",
+  "in_progress",
+  "pending_user",
+  "pending_admin",
+  "resolved",
+  "closed",
+];
+
 const createStatusSummary = (): StatusSummary => {
   const summary = {} as StatusSummary;
   STATUS_KEYS.forEach((key) => {
@@ -78,6 +88,17 @@ const createStatusSummary = (): StatusSummary => {
   });
   return summary;
 };
+
+const createTicketTotals = (): TicketStatusTotals => ({
+  open: 0,
+  assigned: 0,
+  in_progress: 0,
+  pending_user: 0,
+  pending_admin: 0,
+  resolved: 0,
+  closed: 0,
+  total: 0,
+});
 
 export default function ReportsPage() {
   const { lang } = useLanguage();
@@ -91,6 +112,7 @@ export default function ReportsPage() {
 
   const [dateRange, setDateRange] = useState<DateRangeState>(createDefaultDateRange);
   const [selectedTeamId, setSelectedTeamId] = useState<string | "all">("all");
+  const [selectedAreaKey, setSelectedAreaKey] = useState<string>("all");
   const isAdmin = currentUser?.role === "admin" || currentUser?.role === "superadmin";
 
   const statsKey = isAdmin
@@ -218,15 +240,42 @@ export default function ReportsPage() {
         .slice(0, 10); // Top 10 items
     }
 
+    const sortedMembers = [...membersList].sort((a, b) => {
+      const isUnassignedA = a.member.id === "unassigned";
+      const isUnassignedB = b.member.id === "unassigned";
+      if (isUnassignedA && !isUnassignedB) return 1;
+      if (!isUnassignedA && isUnassignedB) return -1;
+
+      const nameA = (a.member.fullName || `${a.member.firstName ?? ""} ${a.member.lastName ?? ""}` || a.member.email || "").trim().toLowerCase();
+      const nameB = (b.member.fullName || `${b.member.firstName ?? ""} ${b.member.lastName ?? ""}` || b.member.email || "").trim().toLowerCase();
+
+      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return 0;
+    });
+
     return {
       total,
       resolved,
       inProgress,
       pieData,
       barData,
-      members: membersList
+      members: sortedMembers
     };
   }, [statsData, selectedTeamId, lang]);
+
+  const sortedTeamsForTable = useMemo(() => {
+    if (!statsData?.teams) return [];
+    return [...statsData.teams].sort((a, b) => {
+      const nameA = a.team.name?.trim().toLowerCase() ?? "";
+      const nameB = b.team.name?.trim().toLowerCase() ?? "";
+      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return 0;
+    });
+  }, [statsData?.teams]);
 
   const selectedTeamLabel = useMemo(() => {
     if (selectedTeamId === "all") return tr(lang, "reports.overview.title");
@@ -282,7 +331,7 @@ export default function ReportsPage() {
         
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:items-center sm:justify-end">
            <div className="w-full sm:w-auto sm:min-w-[260px] sm:max-w-[360px]">
-             <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
               <SelectTrigger
                 className="w-full justify-between text-left"
                 title={selectedTeamLabel}
@@ -292,7 +341,7 @@ export default function ReportsPage() {
                   className="truncate"
                 />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
                 <SelectItem value="all">{tr(lang, "reports.overview.title")}</SelectItem>
                 {statsData?.teams.map((t) => (
                   <SelectItem key={t.team.id} value={t.team.id}>
@@ -492,7 +541,7 @@ export default function ReportsPage() {
                       </TableHeader>
                       <TableBody>
                         {selectedTeamId === "all" ? (
-                          statsData?.teams.map((t) => (
+                          sortedTeamsForTable.map((t) => (
                             <TableRow key={t.team.id}>
                               <TableCell className="font-medium">{t.team.name}</TableCell>
                               {STATUS_KEYS.map((key) => (

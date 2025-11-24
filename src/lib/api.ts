@@ -25,7 +25,8 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.status === 401 && typeof window !== "undefined") {
+    const isAuthLogin = error?.config?.url?.includes("/api/auth/login");
+    if (!isAuthLogin && error?.response?.status === 401 && typeof window !== "undefined") {
       // Clear any existing token
       try { 
         Cookies.remove("ss_token"); 

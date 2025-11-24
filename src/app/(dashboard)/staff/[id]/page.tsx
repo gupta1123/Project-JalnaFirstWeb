@@ -1,27 +1,28 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { getStaffById } from "@/lib/api";
-import type { User } from "@/lib/types";
+import { getStaffById, getTeams, addEmployeesToTeam } from "@/lib/api";
+import type { Team, User } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Mail, Phone, User as UserIcon, Users, Crown } from "lucide-react";
-import { formatDateTimeSmart } from "@/lib/utils";
+import { ArrowLeft, Mail, Phone, User as UserIcon, Users, Crown, Loader2, Check } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 export default function StaffDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { lang } = useLanguage();
   const router = useRouter();
   const { id: staffId } = use(params);
 
-  const { data: staff, isLoading, error } = useSWR(
+  const { data: staff, isLoading, error, mutate } = useSWR(
     staffId ? `staff-${staffId}` : null,
     () => getStaffById(staffId),
     { revalidateOnFocus: false }
@@ -33,7 +34,7 @@ export default function StaffDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="space-y-6">
       <StaffHeader staff={staff} onBack={() => router.back()} lang={lang} />
-      <StaffContent staff={staff} lang={lang} />
+      <StaffContent staff={staff} lang={lang} onTeamAssigned={() => mutate()} />
     </div>
   );
 }
@@ -123,14 +124,14 @@ function StaffHeader({ staff, onBack, lang }: { staff: User; onBack: () => void;
 }
 
 // Main content component
-function StaffContent({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
+function StaffContent({ staff, lang, onTeamAssigned }: { staff: User; lang: "en" | "hi" | "mr"; onTeamAssigned?: () => void }) {
   return (
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         <PersonalInfoCard staff={staff} lang={lang} />
         <ContactInfoCard staff={staff} lang={lang} />
       </div>
-      <TeamInfoCard staff={staff} lang={lang} />
+      <TeamInfoCard staff={staff} lang={lang} onTeamAssigned={onTeamAssigned} />
     </div>
   );
 }
@@ -193,13 +194,46 @@ function ContactInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr
 }
 
 // Team information card
-function TeamInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }) {
+function TeamInfoCard({ staff, lang, onTeamAssigned }: { staff: User; lang: "en" | "hi" | "mr"; onTeamAssigned?: () => void }) {
   const getRoleDisplay = (isLeader: boolean) => {
     return isLeader ? tr(lang, "staffDetail.role.teamLead") : tr(lang, "staffDetail.role.staff");
   };
 
   const getRoleBadgeVariant = (isLeader: boolean) => {
     return isLeader ? "default" : "secondary";
+  };
+
+  const showAssignPrompt = !staff.teams || staff.teams.length === 0;
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [teamSearch, setTeamSearch] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const { data: teamResponse, isLoading: loadingTeams } = useSWR<{ teams: Team[] }>(
+    showAssignPrompt ? ["staff-detail-teams"] : null,
+    () => getTeams({ limit: 100 }),
+    { revalidateOnFocus: false }
+  );
+  const teams = teamResponse?.teams ?? [];
+  const filteredTeams =
+    teamSearch.trim().length === 0
+      ? teams
+      : teams.filter((team) =>
+          team.name.toLowerCase().includes(teamSearch.trim().toLowerCase())
+        );
+
+  const handleAssign = async () => {
+    if (!selectedTeamId) return;
+    setAssigning(true);
+    try {
+      await addEmployeesToTeam(selectedTeamId, [staff._id]);
+      toast.success(tr(lang, "staffDetail.team.assignSuccess"));
+      setSelectedTeamId("");
+      setTeamSearch("");
+      onTeamAssigned?.();
+    } catch (err) {
+      toast.error(tr(lang, "staffDetail.team.assignError"));
+    } finally {
+      setAssigning(false);
+    }
   };
 
   return (
@@ -237,9 +271,70 @@ function TeamInfoCard({ staff, lang }: { staff: User; lang: "en" | "hi" | "mr" }
             ))}
           </div>
         ) : (
-          <div className="text-center py-4">
-            <Users className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">{tr(lang, "staffDetail.team.noTeam")}</p>
+          <div className="text-center py-4 space-y-4">
+            <div className="flex flex-col items-center gap-2">
+              <Users className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">{tr(lang, "staffDetail.team.noTeam")}</p>
+            </div>
+            <div className="space-y-3 max-w-md mx-auto text-left">
+              <p className="text-sm font-medium">{tr(lang, "staffDetail.team.assignTitle")}</p>
+              <Input
+                placeholder={tr(lang, "staffDetail.team.searchPlaceholder")}
+                value={teamSearch}
+                onChange={(e) => setTeamSearch(e.target.value)}
+                disabled={loadingTeams || teams.length === 0}
+              />
+              <div className="max-h-56 overflow-y-auto rounded-md border bg-background/60">
+                {loadingTeams ? (
+                  <p className="p-3 text-sm text-muted-foreground">
+                    {tr(lang, "staffDetail.team.loadingTeams")}
+                  </p>
+                ) : teams.length === 0 ? (
+                  <p className="p-3 text-sm text-muted-foreground">
+                    {tr(lang, "staffDetail.team.noTeamsAvailable")}
+                  </p>
+                ) : filteredTeams.length === 0 ? (
+                  <p className="p-3 text-sm text-muted-foreground">
+                    {tr(lang, "staffDetail.team.noResults")}
+                  </p>
+                ) : (
+                  filteredTeams.map((team) => (
+                    <button
+                      type="button"
+                      key={team._id}
+                      onClick={() => setSelectedTeamId(team._id)}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                        selectedTeamId === team._id
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "hover:bg-muted/60"
+                      }`}
+                    >
+                      <span>{team.name}</span>
+                      {selectedTeamId === team._id && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))
+                )}
+              </div>
+              <Button
+                className="w-full"
+                onClick={handleAssign}
+                disabled={
+                  assigning ||
+                  loadingTeams ||
+                  teams.length === 0 ||
+                  !selectedTeamId
+                }
+              >
+                {assigning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {tr(lang, "staffDetail.team.assigning")}
+                  </>
+                ) : (
+                  tr(lang, "staffDetail.team.assignButton")
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

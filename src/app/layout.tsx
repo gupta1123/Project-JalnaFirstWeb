@@ -3,7 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
-// ThemeInit removed (base theme removed). Accent handled by Topbar hook.
+import { AccentInit } from "@/components/AccentInit";
+// Accent is initialized globally to persist selections across sessions.
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,11 +18,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Jalna First",
-    template: "%s – Jalna First",
+    default: "My-Jalna",
+    template: "%s – My-Jalna",
   },
-  applicationName: "Jalna First",
-  description: "Jalna First Admin Panel",
+  applicationName: "My-Jalna",
+  description: "My-Jalna Admin Panel",
   icons: {
     icon: [
       { url: "/logo.png", type: "image/png" },
@@ -41,7 +42,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          storageKey="my-jalna-theme"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <AccentInit />
           {children}
           <Toaster />
         </ThemeProvider>

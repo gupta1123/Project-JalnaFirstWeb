@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, ExternalLink, Eye, Image, Video, File, User as UserIcon } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
-import type { Ticket, TicketStatus, User, ChangedBy } from "@/lib/types";
+import type { Ticket, TicketStatus, User } from "@/lib/types";
 import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments } from "@/lib/api";
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -19,56 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 
-
-// Helper function to format role display
-const formatUserRole = (user: ChangedBy | User, lang: "en" | "hi" | "mr") => {
-  if (!user) return '';
-
-  // Check for admin role
-  if (user.role === 'admin' || ('displayRole' in user && user.displayRole === 'admin')) {
-    return tr(lang, "complaintDetail.role.admin");
-  }
-
-  // Check for team leader (staff with isTeamLeader: true)
-  if (user.role === 'staff' && 'isTeamLeader' in user && user.isTeamLeader === true) {
-    return tr(lang, "complaintDetail.role.teamLead");
-  }
-
-  // Check for staff
-  if (user.role === 'staff' || ('displayRole' in user && user.displayRole === 'staff')) {
-    return tr(lang, "complaintDetail.role.staff");
-  }
-
-  // Check for team leader display role
-  if ('displayRole' in user && user.displayRole === 'team_leader') {
-    return tr(lang, "complaintDetail.role.teamLead");
-  }
-
-  return '';
-};
-
-// Helper function to format changed by information
-const formatChangedBy = (changedBy: string | User | ChangedBy, lang: "en" | "hi" | "mr") => {
-  if (!changedBy) return tr(lang, "complaintDetail.unknownUser");
-
-  if (typeof changedBy === 'string') return changedBy;
-
-  // Handle User type with role information
-  const userRole = formatUserRole(changedBy, lang);
-  const userName = changedBy.fullName ||
-    (changedBy.firstName && changedBy.lastName ? `${changedBy.firstName} ${changedBy.lastName}` : null) ||
-    changedBy.email ||
-    ('name' in changedBy ? changedBy.name : undefined); // Fallback to name field from API
-
-  if (userName && userRole) {
-    return `${userName} (${userRole})`;
-  }
-
-  // Fallback to name only if available
-  if (userName) return userName;
-
-  return tr(lang, "complaintDetail.unknownUser");
-};
 
 // Helper function to open location in Google Maps
 const openInGoogleMaps = (ticket: Ticket) => {
@@ -512,11 +462,6 @@ export default function ComplaintDetailPage() {
                                       )}
                                     </div>
                                     
-                                    {h.changedBy && (
-                                      <div className="text-xs text-muted-foreground pt-1 border-t border-border/50">
-                                        {tr(lang, "complaintDetail.changedBy")}: {formatChangedBy(h.changedBy, lang)}
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -533,9 +478,6 @@ export default function ComplaintDetailPage() {
                                 {n.addedAt && (
                               <div className="opacity-70 mt-1">
                                 {formatDateTimeSmart(n.addedAt)}
-                                {n.addedBy && (
-                                  <span> • by {formatChangedBy(n.addedBy, lang)}</span>
-                                )}
                               </div>
                             )}
                   </div>
@@ -773,4 +715,3 @@ export default function ComplaintDetailPage() {
     </Card>
   );
 }
-

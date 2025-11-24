@@ -29,14 +29,52 @@ export default function UsersPage() {
   const [password, setPassword] = useState("");
   const [showPasswordDialog, setShowPasswordDialog] = useState(true);
 
-  const queryKey = useMemo(() => ["users", { page, limit, search }], [page, limit, search]);
+  const queryKey = useMemo(() => ["users-all", { search }], [search]);
+
+  const fetchAllUsers = async () => {
+    const perPage = 100;
+    let pageCursor = 1;
+    let totalPages = 1;
+    const collected: User[] = [];
+
+    do {
+      const res = await getUsers({ page: pageCursor, limit: perPage, search: search || undefined });
+      if (res?.users?.length) {
+        collected.push(...res.users);
+      }
+      totalPages = res?.pagination?.totalPages ?? totalPages;
+      pageCursor += 1;
+      if (!res?.pagination) break;
+    } while (pageCursor <= totalPages);
+
+    return { users: collected };
+  };
+
   const { data, isLoading } = useSWR(
     isAuthenticated ? queryKey : null,
-    () => getUsers({ page, limit, search: search || undefined }),
+    fetchAllUsers,
     { revalidateOnFocus: false }
   );
-  const users: User[] = data?.users ?? [];
-  const pagination = data?.pagination;
+
+  const sortedUsers: User[] = useMemo(() => {
+    const list = data?.users ?? [];
+    return [...list].sort((a, b) => {
+      const nameA = (a.fullName ?? `${a.firstName ?? ""} ${a.lastName ?? ""}`).trim().toLowerCase();
+      const nameB = (b.fullName ?? `${b.firstName ?? ""} ${b.lastName ?? ""}`).trim().toLowerCase();
+      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+      if (nameA) return -1;
+      if (nameB) return 1;
+      return 0;
+    });
+  }, [data?.users]);
+
+  const totalUsers = sortedUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
+  const currentPage = Math.min(page, totalPages);
+  const visibleUsers = useMemo(() => {
+    const start = (currentPage - 1) * limit;
+    return sortedUsers.slice(start, start + limit);
+  }, [sortedUsers, currentPage, limit]);
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,12 +197,12 @@ export default function UsersPage() {
                         ))}
                       </>
                     )}
-                    {!isLoading && users.length === 0 && (
+                    {!isLoading && sortedUsers.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={5}>{tr(lang, "users.empty.none")}</TableCell>
                       </TableRow>
                     )}
-                    {users.map((u: User) => (
+                    {visibleUsers.map((u: User) => (
                       <TableRow key={u._id}>
                         <TableCell>{u.fullName ?? `${u.firstName} ${u.lastName}`}</TableCell>
                         <TableCell>{u.email}</TableCell>
@@ -186,74 +224,56 @@ export default function UsersPage() {
                   </TableBody>
                 </Table>
               </div>
-              {pagination && (
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground text-center">
-                    {tr(lang, "users.pagination.showing")} {pagination.currentPage} {tr(lang, "users.pagination.of")} {pagination.totalPages} ({pagination.totalUsers} {tr(lang, "users.pagination.totalUsers")})
-                  </div>
-                  <Pagination className="pt-2">
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          href="#" 
-                          onClick={(e) => { 
-                            e.preventDefault(); 
-                            if (pagination.hasPrevPage) setPage((p) => Math.max(1, p - 1)); 
-                          }} 
-                        />
-                      </PaginationItem>
-                      {(() => {
-                        const totalPages = pagination.totalPages;
-                        const currentPage = pagination.currentPage;
-                        const pages: number[] = [];
-                        
-                        // Calculate the range of pages to show
-                        let startPage = Math.max(1, currentPage - 2);
-                        let endPage = Math.min(totalPages, currentPage + 2);
-                        
-                        // Adjust if we're near the beginning or end
-                        if (currentPage <= 3) {
-                          endPage = Math.min(5, totalPages);
-                        }
-                        if (currentPage >= totalPages - 2) {
-                          startPage = Math.max(1, totalPages - 4);
-                        }
-                        
-                        // Generate unique page numbers
-                        for (let i = startPage; i <= endPage; i++) {
-                          if (!pages.includes(i)) {
-                            pages.push(i);
-                          }
-                        }
-                        
-                        return pages.map((pageNum) => (
-                          <PaginationItem key={pageNum}>
-                            <PaginationLink 
-                              href="#" 
-                              isActive={pageNum === currentPage}
-                              onClick={(e) => { 
-                                e.preventDefault(); 
-                                setPage(pageNum); 
-                              }}
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ));
-                      })()}
-                      <PaginationItem>
-                        <PaginationNext 
-                          href="#" 
-                          onClick={(e) => { 
-                            e.preventDefault(); 
-                            if (pagination.hasNextPage) setPage((p) => p + 1); 
-                          }} 
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground text-center">
+                  {tr(lang, "users.pagination.showing")} {currentPage} {tr(lang, "users.pagination.of")} {totalPages} ({totalUsers} {tr(lang, "users.pagination.totalUsers")})
                 </div>
-              )}
+                <Pagination className="pt-2">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage((prev) => Math.max(prev - 1, 1));
+                        }}
+                        aria-disabled={currentPage === 1}
+                        tabIndex={currentPage === 1 ? -1 : undefined}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: totalPages }).map((_, idx) => {
+                      const pageNumber = idx + 1;
+                      return (
+                        <PaginationItem key={pageNumber}>
+                          <PaginationLink
+                            href="#"
+                            isActive={pageNumber === currentPage}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setPage(pageNumber);
+                            }}
+                          >
+                            {pageNumber}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage((prev) => Math.min(prev + 1, totalPages));
+                        }}
+                        aria-disabled={currentPage === totalPages}
+                        tabIndex={currentPage === totalPages ? -1 : undefined}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
             </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">

@@ -81,10 +81,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard" className="flex items-center gap-2">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden">
-                  <Image src="/logo.png" alt="Jalna First" width={32} height={32} className="object-contain" />
+                  <Image src="/logo.png" alt="My-Jalna" width={32} height={32} className="object-contain" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Jalna First</span>
+                  <span className="truncate font-medium">My-Jalna</span>
                   <span className="truncate text-xs">{panelTitle}</span>
                 </div>
               </Link>
@@ -109,4 +109,3 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     </Sidebar>
   );
 }
-

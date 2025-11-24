@@ -5,7 +5,6 @@ import useSWR from 'swr';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { formatDateTimeSmart } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -196,6 +195,32 @@ function pickHeaderImage(category: keyof typeof headerArt): string {
   return headerArt[category][pickIndex];
 }
 
+function formatDashboardDate() {
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const lookup = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+
+  const day = lookup('day');
+  const month = lookup('month');
+  const year = lookup('year');
+  const weekday = lookup('weekday');
+  const hour = lookup('hour');
+  const minute = lookup('minute');
+  const dayPeriod = lookup('dayPeriod');
+
+  return `${day} ${month} ${year}, ${weekday}, ${hour}:${minute} ${dayPeriod}`.replace(/\s+/g, ' ').trim();
+}
+
 /* -------------------- Page -------------------- */
 export default function DashboardPage() {
   const { lang } = useLanguage();
@@ -224,7 +249,10 @@ export default function DashboardPage() {
   // Avoid hydration mismatch: compute on client after mount
   const [today, setToday] = useState<string | null>(null);
   useEffect(() => {
-    setToday(formatDateTimeSmart(new Date().toISOString()));
+    const tick = () => setToday(formatDashboardDate());
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
   }, []);
 
   return (
@@ -455,33 +483,29 @@ function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
 }
 
 function GradientMini({ title, href, variant = 'base', disabled = false }: { title: string; href?: string; variant?: 'base' | 'alt'; disabled?: boolean }) {
-  const style =
+  const variantClasses =
     variant === 'base'
-      ? ({ ['--grad-from' as unknown as string]: 'var(--primary)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--primary) 40%, var(--accent))' } as React.CSSProperties)
-      : ({ ['--grad-from' as unknown as string]: 'var(--accent)', ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--accent) 40%, var(--primary))' } as React.CSSProperties);
+      ? 'border-primary/40 bg-primary/5 hover:bg-primary/10 focus-visible:ring-primary/40'
+      : 'border-accent/40 bg-accent/5 hover:bg-accent/10 focus-visible:ring-accent/40';
+
   if (disabled) {
     return (
-      <motion.div style={style} whileHover={{ scale: 1.01 }} className="relative block rounded-xl p-[1px] cursor-not-allowed opacity-80" aria-disabled>
-        <div className="animated-gradient-surface rounded-xl p-[1px]">
-          <div className="rounded-[calc(theme(borderRadius.xl)-1px)] bg-background">
-            <div className="flex items-center justify-between gap-4 p-4">
-              <span className="text-sm font-medium">{title}</span>
-              <span className="text-xs text-muted-foreground">Coming soon</span>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+      <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 px-4 py-4 flex items-center justify-between gap-4 cursor-not-allowed opacity-80">
+        <span className="text-sm font-medium text-muted-foreground">{title}</span>
+        <span className="text-xs text-muted-foreground">Coming soon</span>
+      </div>
     );
   }
+
   return (
-    <motion.a href={href} style={style} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.99 }} className="relative block rounded-xl p-[1px]">
-      <div className="animated-gradient-surface rounded-xl p-[1px]">
-        <div className="rounded-[calc(theme(borderRadius.xl)-1px)] bg-background">
-          <div className="flex items-center justify-between gap-4 p-4">
-            <span className="text-sm font-medium">{title}</span>
-            <span className="text-xs text-muted-foreground">Open →</span>
-          </div>
-        </div>
+    <motion.a
+      href={href}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      className={`relative block rounded-xl border px-4 py-4 text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${variantClasses}`}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-medium">{title}</span>
       </div>
     </motion.a>
   );

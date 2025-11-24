@@ -1,7 +1,7 @@
 "use client";
 
 import { z } from "zod";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ const schema = z.object({
 });
 
 type Values = z.infer<typeof schema>;
+const AGENCY_TYPES: Values["agencyType"][] = ["police", "fire", "medical", "municipal", "government", "other"];
 
 export function AgencyContactForm({
   initial,
@@ -54,6 +55,8 @@ export function AgencyContactForm({
     phoneType: initial?.phoneNumbers?.[0]?.type ?? "office",
   });
 
+  const [typeSearch, setTypeSearch] = useState("");
+
   function set<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((v) => ({ ...v, [key]: value }));
   }
@@ -62,6 +65,19 @@ export function AgencyContactForm({
     values.phoneNumber.length > 0 && values.phoneNumber.length < 10
       ? tr(currentLang, "agencyContacts.form.phoneError")
       : undefined;
+
+  const filteredTypes = useMemo(() => {
+    const query = typeSearch.trim().toLowerCase();
+    if (!query) return AGENCY_TYPES;
+    return AGENCY_TYPES.filter((type) => {
+      const label = tr(currentLang, `agencyContacts.form.types.${type}`).toLowerCase();
+      return type.includes(query) || label.includes(query);
+    });
+  }, [currentLang, typeSearch]);
+
+  const handleTypeOpenChange = (open: boolean) => {
+    if (!open) setTypeSearch("");
+  };
 
   return (
     <form
@@ -77,6 +93,37 @@ export function AgencyContactForm({
       }}
     >
       <div className="grid gap-1">
+        <Label className="flex items-center gap-2"><Building2 className="size-4 text-muted-foreground" /> {tr(currentLang, "agencyContacts.form.agencyType")}</Label>
+        <Select value={values.agencyType} onValueChange={(v) => set("agencyType", v as Values["agencyType"])} onOpenChange={handleTypeOpenChange}>
+          <SelectTrigger>
+            <SelectValue placeholder={tr(currentLang, "agencyContacts.form.selectType")} />
+          </SelectTrigger>
+          <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+            <div className="px-1 pb-1">
+              <Input
+                autoFocus
+                className="h-8"
+                placeholder={tr(currentLang, "agencyContacts.filters.typeSearchPlaceholder")}
+                value={typeSearch}
+                onChange={(e) => setTypeSearch(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>
+            {filteredTypes.length > 0 ? (
+              filteredTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {tr(currentLang, `agencyContacts.form.types.${type}`)}
+                </SelectItem>
+              ))
+            ) : (
+              <div className="px-2 py-3 text-sm text-muted-foreground">
+                {tr(currentLang, "agencyContacts.empty.none")}
+              </div>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-1">
         <Label className="flex items-center gap-2"><UserIcon className="size-4 text-muted-foreground" /> {tr(currentLang, "agencyContacts.form.name")}</Label>
         <Input value={values.name} onChange={(e) => set("name", e.target.value)} required />
       </div>
@@ -87,22 +134,6 @@ export function AgencyContactForm({
       <div className="grid gap-1">
         <Label className="flex items-center gap-2"><Building2 className="size-4 text-muted-foreground" /> {tr(currentLang, "agencyContacts.form.agencyName")}</Label>
         <Input value={values.agencyName} onChange={(e) => set("agencyName", e.target.value)} required />
-      </div>
-      <div className="grid gap-1">
-        <Label className="flex items-center gap-2"><Building2 className="size-4 text-muted-foreground" /> {tr(currentLang, "agencyContacts.form.agencyType")}</Label>
-        <Select value={values.agencyType} onValueChange={(v) => set("agencyType", v as Values["agencyType"]) }>
-          <SelectTrigger>
-            <SelectValue placeholder={tr(currentLang, "agencyContacts.form.selectType")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="police">{tr(currentLang, "agencyContacts.form.types.police")}</SelectItem>
-            <SelectItem value="fire">{tr(currentLang, "agencyContacts.form.types.fire")}</SelectItem>
-            <SelectItem value="medical">{tr(currentLang, "agencyContacts.form.types.medical")}</SelectItem>
-            <SelectItem value="municipal">{tr(currentLang, "agencyContacts.form.types.municipal")}</SelectItem>
-            <SelectItem value="government">{tr(currentLang, "agencyContacts.form.types.government")}</SelectItem>
-            <SelectItem value="other">{tr(currentLang, "agencyContacts.form.types.other")}</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="grid gap-1">

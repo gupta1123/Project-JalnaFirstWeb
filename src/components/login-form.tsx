@@ -24,12 +24,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = schema.safeParse({ email, password });
     if (!parsed.success) {
-      toast.error(tr(lang, "login.toast.invalidInputs"));
+      const message = tr(lang, "login.toast.invalidInputs");
+      setErrorMessage(message);
+      toast.error(message);
       return;
     }
     setLoading(true);
@@ -38,15 +41,20 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       // For now, keep the token approach until backend supports httpOnly cookies
       setAuthToken(res.token);
       toast.success(tr(lang, "login.toast.success"));
+      setErrorMessage(null);
       const next = search.get("next") ?? "/dashboard";
       router.replace(next);
     } catch (err: unknown) {
       const anyErr = err as { response?: { status?: number; data?: { message?: string } } };
       if (anyErr?.response?.status === 401) {
-        toast.error(tr(lang, "login.toast.invalidPassword"));
+        const message = tr(lang, "login.toast.invalidPassword");
+        setErrorMessage(message);
+        toast.error(message);
         return;
       }
-      toast.error(anyErr?.response?.data?.message ?? tr(lang, "login.toast.error"));
+      const fallback = anyErr?.response?.data?.message ?? tr(lang, "login.toast.error");
+      setErrorMessage(fallback);
+      toast.error(fallback);
     } finally {
       setLoading(false);
     }
@@ -64,7 +72,17 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="email">{tr(lang, "login.labels.email")}</Label>
-                <Input id="email" type="email" placeholder={tr(lang, "login.placeholder.email")} required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder={tr(lang, "login.placeholder.email")}
+                  required
+                  value={email}
+                  onChange={(e) => {
+                    if (errorMessage) setErrorMessage(null);
+                    setEmail(e.target.value);
+                  }}
+                />
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="password">{tr(lang, "login.labels.password")}</Label>
@@ -74,7 +92,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                     type={showPassword ? "text" : "password"}
                     required
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      if (errorMessage) setErrorMessage(null);
+                      setPassword(e.target.value);
+                    }}
                     className="pr-12"
                   />
                   <button
@@ -87,17 +108,24 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   </button>
                 </div>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? tr(lang, "login.button.loading") : tr(lang, "login.button.submit")}
-              </Button>
+              <div className="space-y-2">
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? tr(lang, "login.button.loading") : tr(lang, "login.button.submit")}
+                </Button>
+                {errorMessage && (
+                  <p className="text-sm text-destructive text-center" role="alert">
+                    {errorMessage}
+                  </p>
+                )}
+              </div>
               {/* Social sign-in and sign-up removed */}
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="Jalna First" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.25] dark:grayscale" />
+            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="My-Jalna" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.25] dark:grayscale" />
             <div className="absolute inset-0 grid place-items-center">
               <div className="backdrop-blur-[2px] bg-background/40 dark:bg-black/30 rounded-md px-4 py-2 shadow-sm">
-                <div className="text-xl font-semibold tracking-tight">Jalna First</div>
+                <div className="text-xl font-semibold tracking-tight">My-Jalna</div>
               </div>
             </div>
           </div>
@@ -107,4 +135,3 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     </div>
   );
 }
-
