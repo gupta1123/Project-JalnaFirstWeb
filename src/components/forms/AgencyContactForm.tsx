@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import type { AgencyContact } from "@/lib/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { User as UserIcon, Briefcase, Building2, MapPin, Phone } from "lucide-react";
+import { User as UserIcon, Briefcase, Building2, MapPin, Phone, ChevronDown } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 
@@ -56,6 +56,7 @@ export function AgencyContactForm({
   });
 
   const [typeSearch, setTypeSearch] = useState("");
+  const [typeShowAll, setTypeShowAll] = useState(false);
 
   function set<K extends keyof Values>(key: K, value: Values[K]) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -75,8 +76,25 @@ export function AgencyContactForm({
     });
   }, [currentLang, typeSearch]);
 
+  const typeDisplayOptions = useMemo(() => {
+    if (typeSearch.trim() || typeShowAll) return filteredTypes;
+    return filteredTypes.slice(0, 3);
+  }, [filteredTypes, typeSearch, typeShowAll]);
+
+  const typeRenderOptions = useMemo(() => {
+    if (values.agencyType && !typeDisplayOptions.includes(values.agencyType)) {
+      return [values.agencyType, ...typeDisplayOptions];
+    }
+    return typeDisplayOptions;
+  }, [typeDisplayOptions, values.agencyType]);
+
+  const typeHasMore = filteredTypes.length > 3 && !typeSearch.trim();
+
   const handleTypeOpenChange = (open: boolean) => {
-    if (!open) setTypeSearch("");
+    if (!open) {
+      setTypeSearch("");
+      setTypeShowAll(false);
+    }
   };
 
   return (
@@ -98,23 +116,42 @@ export function AgencyContactForm({
           <SelectTrigger>
             <SelectValue placeholder={tr(currentLang, "agencyContacts.form.selectType")} />
           </SelectTrigger>
-          <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+          <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
             <div className="px-1 pb-1">
               <Input
                 autoFocus
                 className="h-8"
                 placeholder={tr(currentLang, "agencyContacts.filters.typeSearchPlaceholder")}
                 value={typeSearch}
-                onChange={(e) => setTypeSearch(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setTypeSearch(value);
+                  setTypeShowAll(Boolean(value.trim()));
+                }}
                 onKeyDown={(e) => e.stopPropagation()}
               />
             </div>
-            {filteredTypes.length > 0 ? (
-              filteredTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {tr(currentLang, `agencyContacts.form.types.${type}`)}
-                </SelectItem>
-              ))
+            {typeRenderOptions.length > 0 ? (
+              <>
+                {typeRenderOptions.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {tr(currentLang, `agencyContacts.form.types.${type}`)}
+                  </SelectItem>
+                ))}
+                {typeHasMore && !typeShowAll && (
+                  <div
+                    className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTypeShowAll(true);
+                    }}
+                  >
+                    <ChevronDown className="size-4" />
+                    {tr(currentLang, "agencyContacts.filters.viewMore")} ({filteredTypes.length - 3})
+                  </div>
+                )}
+              </>
             ) : (
               <div className="px-2 py-3 text-sm text-muted-foreground">
                 {tr(currentLang, "agencyContacts.empty.none")}

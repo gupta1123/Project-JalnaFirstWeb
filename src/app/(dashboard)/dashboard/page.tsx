@@ -437,7 +437,7 @@ export default function DashboardPage() {
             <GradientMini title={tr(lang, 'dashboard.quick.admin.checkComplaints')} href="/complaints" />
             <GradientMini title={tr(lang, 'dashboard.quick.admin.manageTeams')} href="/teams" variant="alt" />
             <GradientMini title={tr(lang, 'dashboard.quick.admin.browseContacts')} href="/agency-contacts" variant="alt" />
-            <GradientMini title={tr(lang, 'dashboard.quick.admin.viewReports')} variant="alt" disabled />
+            <GradientMini title={tr(lang, 'dashboard.quick.admin.viewReports')} href="/reports" variant="alt" />
           </>
         )}
         {isStaff && (

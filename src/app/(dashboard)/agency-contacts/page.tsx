@@ -39,7 +39,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { AgencyContactForm } from "@/components/forms/AgencyContactForm";
-import { MoreVertical, Plus, Trash2, Eye, Pencil } from "lucide-react";
+import { MoreVertical, Plus, Trash2, Eye, Pencil, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/LanguageProvider";
@@ -57,6 +57,7 @@ export default function AgencyContactsPage() {
   const [isEditOpen, setIsEditOpen] = useState<null | string>(null);
   const [submitting, setSubmitting] = useState(false);
   const [typeFilterSearch, setTypeFilterSearch] = useState("");
+  const [typeFilterShowAll, setTypeFilterShowAll] = useState(false);
 
   const [page, setPage] = useState(1);
   const limit = 20;
@@ -193,8 +194,25 @@ export default function AgencyContactsPage() {
     });
   }, [lang, typeFilterSearch]);
 
+  const typeDisplayOptions = useMemo(() => {
+    if (typeFilterSearch.trim() || typeFilterShowAll) return filteredAgencyTypeOptions;
+    return filteredAgencyTypeOptions.slice(0, 3);
+  }, [filteredAgencyTypeOptions, typeFilterSearch, typeFilterShowAll]);
+
+  const typeRenderOptions = useMemo(() => {
+    if (agencyTypeFilter && agencyTypeFilter !== "" && !typeDisplayOptions.includes(agencyTypeFilter as AgencyContact["agencyType"])) {
+      return [agencyTypeFilter as AgencyContact["agencyType"], ...typeDisplayOptions];
+    }
+    return typeDisplayOptions;
+  }, [typeDisplayOptions, agencyTypeFilter]);
+
+  const typeHasMore = filteredAgencyTypeOptions.length > 3 && !typeFilterSearch.trim();
+
   const handleTypeSelectOpenChange = (open: boolean) => {
-    if (!open) setTypeFilterSearch("");
+    if (!open) {
+      setTypeFilterSearch("");
+      setTypeFilterShowAll(false);
+    }
   };
 
   return (
@@ -232,24 +250,43 @@ export default function AgencyContactsPage() {
               <SelectTrigger className="w-full md:w-48 lg:w-56" aria-label={tr(lang, "agencyContacts.filters.typeLabel")}>
                 <SelectValue placeholder={tr(lang, "agencyContacts.filters.typeLabel")} />
               </SelectTrigger>
-              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
                 <div className="px-1 pb-1">
                   <Input
                     autoFocus
                     className="h-8"
                     placeholder={tr(lang, "agencyContacts.filters.typeSearchPlaceholder")}
                     value={typeFilterSearch}
-                    onChange={(e) => setTypeFilterSearch(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setTypeFilterSearch(value);
+                      setTypeFilterShowAll(Boolean(value.trim()));
+                    }}
                     onKeyDown={(e) => e.stopPropagation()}
                   />
                 </div>
                 <SelectItem value="all">{tr(lang, "agencyContacts.filters.allTypes")}</SelectItem>
-                {filteredAgencyTypeOptions.length > 0 ? (
-                  filteredAgencyTypeOptions.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {tr(lang, `agencyContacts.form.types.${type}`)}
-                    </SelectItem>
-                  ))
+                {typeRenderOptions.length > 0 ? (
+                  <>
+                    {typeRenderOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {tr(lang, `agencyContacts.form.types.${type}`)}
+                      </SelectItem>
+                    ))}
+                    {typeHasMore && !typeFilterShowAll && (
+                      <div
+                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTypeFilterShowAll(true);
+                        }}
+                      >
+                        <ChevronDown className="size-4" />
+                        {tr(lang, "agencyContacts.filters.viewMore")} ({filteredAgencyTypeOptions.length - 3})
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="px-2 py-3 text-sm text-muted-foreground">
                     {tr(lang, "agencyContacts.empty.none")}

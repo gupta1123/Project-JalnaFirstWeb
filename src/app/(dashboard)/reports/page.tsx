@@ -14,7 +14,7 @@ import { useLanguage } from "@/components/LanguageProvider";
 import { tr, type Lang } from "@/lib/i18n";
 import { getCurrentUser, getAdminTeamStats } from "@/lib/api";
 import type { AdminTeamStatsResponse, TicketStatusTotals, TeamMemberStat } from "@/lib/types";
-import { AlertCircle, BarChart3, RefreshCw, TrendingUp, Activity, CheckCircle2, FileText, MapPin } from "lucide-react";
+import { AlertCircle, BarChart3, RefreshCw, TrendingUp, Activity, CheckCircle2, FileText, MapPin, ChevronDown } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -112,7 +112,10 @@ export default function ReportsPage() {
 
   const [dateRange, setDateRange] = useState<DateRangeState>(createDefaultDateRange);
   const [selectedTeamId, setSelectedTeamId] = useState<string | "all">("all");
+  const [teamSearch, setTeamSearch] = useState("");
   const [selectedAreaKey, setSelectedAreaKey] = useState<string>("all");
+  const [showAllTeams, setShowAllTeams] = useState(false);
+  const [selectOpen, setSelectOpen] = useState(false);
   const isAdmin = currentUser?.role === "admin" || currentUser?.role === "superadmin";
 
   const statsKey = isAdmin
@@ -164,13 +167,15 @@ export default function ReportsPage() {
     let membersList: TeamMemberStat[] = teamData?.members ?? [];
 
     if (selectedTeamId === "all") {
-      // Compare Teams
+      // Compare Teams - show all statuses
       barData = (statsData?.teams || [])
         .map(t => ({
           name: t.team.name,
           open: t.teamStats.open || 0,
-          wip: (t.teamStats.in_progress || 0) + (t.teamStats.assigned || 0),
-          resolved: (t.teamStats.resolved || 0) + (t.teamStats.closed || 0),
+          assigned: t.teamStats.assigned || 0,
+          in_progress: t.teamStats.in_progress || 0,
+          resolved: t.teamStats.resolved || 0,
+          closed: t.teamStats.closed || 0,
           total: t.teamStats.total || 0
         }))
         .sort((a, b) => b.total - a.total)
@@ -220,7 +225,7 @@ export default function ReportsPage() {
         ];
       }
 
-      // Compare Members (including unassigned)
+      // Compare Members (including unassigned) - show all statuses
       barData = membersList
         .map(m => {
            const fallbackName = m.member.email || unknownLabel;
@@ -231,8 +236,10 @@ export default function ReportsPage() {
            return {
              name: name,
              open: m.stats.open || 0,
-             wip: (m.stats.in_progress || 0) + (m.stats.assigned || 0),
-             resolved: (m.stats.resolved || 0) + (m.stats.closed || 0),
+             assigned: m.stats.assigned || 0,
+             in_progress: m.stats.in_progress || 0,
+             resolved: m.stats.resolved || 0,
+             closed: m.stats.closed || 0,
              total: m.stats.total || 0
            };
         })
@@ -276,6 +283,23 @@ export default function ReportsPage() {
       return 0;
     });
   }, [statsData?.teams]);
+
+  const filteredTeams = useMemo(() => {
+    if (!teamSearch.trim()) return sortedTeamsForTable;
+    const query = teamSearch.trim().toLowerCase();
+    return sortedTeamsForTable.filter((team) => team.team.name?.toLowerCase().includes(query));
+  }, [teamSearch, sortedTeamsForTable]);
+
+  // Teams to display - show only 3 if not expanded and not searching
+  const displayTeams = useMemo(() => {
+    const hasSearch = teamSearch.trim().length > 0;
+    if (hasSearch || showAllTeams) {
+      return filteredTeams;
+    }
+    return filteredTeams.slice(0, 3);
+  }, [filteredTeams, teamSearch, showAllTeams]);
+
+  const hasMoreTeams = filteredTeams.length > 3 && !teamSearch.trim();
 
   const selectedTeamLabel = useMemo(() => {
     if (selectedTeamId === "all") return tr(lang, "reports.overview.title");
@@ -331,7 +355,18 @@ export default function ReportsPage() {
         
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:items-center sm:justify-end">
            <div className="w-full sm:w-auto sm:min-w-[260px] sm:max-w-[360px]">
-            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+            <Select 
+              value={selectedTeamId} 
+              onValueChange={setSelectedTeamId}
+              open={selectOpen}
+              onOpenChange={(open) => {
+                setSelectOpen(open);
+                if (!open) {
+                  setShowAllTeams(false);
+                  setTeamSearch("");
+                }
+              }}
+            >
               <SelectTrigger
                 className="w-full justify-between text-left"
                 title={selectedTeamLabel}
@@ -341,13 +376,49 @@ export default function ReportsPage() {
                   className="truncate"
                 />
               </SelectTrigger>
-              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
+                <div className="px-2 pb-1">
+                  <Input
+                    autoFocus
+                    value={teamSearch}
+                    onChange={(e) => {
+                      setTeamSearch(e.target.value);
+                      if (e.target.value.trim()) {
+                        setShowAllTeams(true);
+                      }
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder={tr(lang, "reports.teamSearchPlaceholder")}
+                    className="h-8"
+                  />
+                </div>
                 <SelectItem value="all">{tr(lang, "reports.overview.title")}</SelectItem>
-                {statsData?.teams.map((t) => (
-                  <SelectItem key={t.team.id} value={t.team.id}>
-                    {t.team.name}
-                  </SelectItem>
-                ))}
+                {displayTeams.length > 0 ? (
+                  <>
+                    {displayTeams.map((t) => (
+                      <SelectItem key={t.team.id} value={t.team.id}>
+                        {t.team.name}
+                      </SelectItem>
+                    ))}
+                    {hasMoreTeams && !showAllTeams && (
+                      <div 
+                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowAllTeams(true);
+                        }}
+                      >
+                        <ChevronDown className="size-4" />
+                        {tr(lang, "reports.teamViewMore")} ({filteredTeams.length - 3})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    {tr(lang, "reports.teamSearchEmpty")}
+                  </div>
+                )}
               </SelectContent>
             </Select>
            </div>
@@ -500,11 +571,18 @@ export default function ReportsPage() {
                               cursor={{fill: 'transparent'}}
                               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                            />
-                           <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} height={36} />
+                           <Legend verticalAlign="top" align="right" iconType="circle" iconSize={8} height={STATUS_KEYS.length * 12} />
                            
-                           <Bar dataKey="open" name={tr(lang, "reports.status.open")} fill={COLORS.danger} radius={[0, 4, 4, 0]} barSize={8} />
-                           <Bar dataKey="wip" name={tr(lang, "reports.status.in_progress")} fill={COLORS.warning} radius={[0, 4, 4, 0]} barSize={8} />
-                           <Bar dataKey="resolved" name={tr(lang, "reports.status.resolved")} fill={COLORS.success} radius={[0, 4, 4, 0]} barSize={8} />
+                           {STATUS_KEYS.map((statusKey) => (
+                             <Bar 
+                               key={statusKey}
+                               dataKey={statusKey} 
+                               name={tr(lang, `reports.status.${statusKey}`)} 
+                               fill={STATUS_COLORS[statusKey]} 
+                               radius={[0, 4, 4, 0]} 
+                               barSize={8} 
+                             />
+                           ))}
                          </BarChart>
                        </ResponsiveContainer>
                      ) : (

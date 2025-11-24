@@ -17,66 +17,80 @@ import { formatDateTimeSmart } from "@/lib/utils";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronDown } from "lucide-react";
+
+const FIXED_CATEGORIES = [
+  {
+    name: "Public Safety",
+    subcategories: [
+      "Law and Order",
+      "Robbery and Theft",
+      "Accident",
+      "Stampede",
+      "Sound Pollution",
+    ],
+  },
+  {
+    name: "Infrastructure and Roads",
+    subcategories: [
+      "Potholes",
+      "Incomplete Roads",
+      "Streetlights",
+      "Encroachment",
+      "Tree Cutting",
+      "Black Spots",
+    ],
+  },
+  {
+    name: "Sanitation and Utilities",
+    subcategories: [
+      "Open Gutters and Manholes",
+      "Sewer Choke",
+      "Water Leakage or No Supply",
+      "Solid Waste Missed Pickup",
+      "Public Toilets",
+    ],
+  },
+  {
+    name: "Traffic and Transport",
+    subcategories: [
+      "Illegal Parking",
+      "Traffic Congestion",
+    ],
+  },
+  {
+    name: "Livelihood and Local Order",
+    subcategories: [
+      "Hawkers Non Designated",
+      "Stray Animals",
+    ],
+  },
+] as const;
+
+const CATEGORY_NAMES = FIXED_CATEGORIES.map((cat) => cat.name);
+const STATUS_VALUES = ["open", "in_progress", "assigned", "resolved", "closed"] as const;
+const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
+
+type StatusValue = (typeof STATUS_VALUES)[number];
+type PriorityValue = (typeof PRIORITY_VALUES)[number];
+type CategoryName = (typeof CATEGORY_NAMES)[number];
 
 export default function ComplaintsPage() {
   const { lang } = useLanguage();
-
-  // Fixed categories & subcategories as configured in backend
-  const fixedCategories = [
-    {
-      name: "Public Safety",
-      subcategories: [
-        "Law and Order",
-        "Robbery and Theft",
-        "Accident",
-        "Stampede",
-        "Sound Pollution",
-      ],
-    },
-    {
-      name: "Infrastructure and Roads",
-      subcategories: [
-        "Potholes",
-        "Incomplete Roads",
-        "Streetlights",
-        "Encroachment",
-        "Tree Cutting",
-        "Black Spots",
-      ],
-    },
-    {
-      name: "Sanitation and Utilities",
-      subcategories: [
-        "Open Gutters and Manholes",
-        "Sewer Choke",
-        "Water Leakage or No Supply",
-        "Solid Waste Missed Pickup",
-        "Public Toilets",
-      ],
-    },
-    {
-      name: "Traffic and Transport",
-      subcategories: [
-        "Illegal Parking",
-        "Traffic Congestion",
-      ],
-    },
-    {
-      name: "Livelihood and Local Order",
-      subcategories: [
-        "Hawkers Non Designated",
-        "Stray Animals",
-      ],
-    },
-  ] as const;
 
   const [page, setPage] = useState(1);
   const [pageInput, setPageInput] = useState("1");
   const [limit] = useState(15);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>("open");
-  const [category, setCategory] = useState<string>("");
-  const [priority, setPriority] = useState<string>("");
+  const [status, setStatus] = useState<"all" | StatusValue>("open");
+  const [category, setCategory] = useState<"" | "all" | CategoryName>("");
+  const [priority, setPriority] = useState<"" | "all" | PriorityValue>("");
+  const [statusSearch, setStatusSearch] = useState("");
+  const [statusShowAll, setStatusShowAll] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryShowAll, setCategoryShowAll] = useState(false);
+  const [prioritySearch, setPrioritySearch] = useState("");
+  const [priorityShowAll, setPriorityShowAll] = useState(false);
   const params = useMemo(() => {
     const allowed = new Set(["open", "in_progress", "assigned", "resolved", "closed"]);
     const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
@@ -137,46 +151,261 @@ export default function ComplaintsPage() {
     return statusMap[status] || status;
   };
 
+  const filteredStatusValues = useMemo(() => {
+    const base = Array.from(STATUS_VALUES);
+    const query = statusSearch.trim().toLowerCase();
+    if (!query) return base;
+    return base.filter((value) => {
+      const label = tr(lang, `complaints.filters.status.${getStatusKey(value)}`).toLowerCase();
+      return label.includes(query) || value.replace(/_/g, " ").toLowerCase().includes(query);
+    });
+  }, [statusSearch, lang]);
+
+  const statusDisplayValues = useMemo(() => {
+    if (statusSearch.trim() || statusShowAll) return filteredStatusValues;
+    return filteredStatusValues.slice(0, 3);
+  }, [filteredStatusValues, statusSearch, statusShowAll]);
+
+  const statusRenderValues = useMemo(() => {
+    if (status !== "all" && !statusDisplayValues.includes(status)) {
+      return [status, ...statusDisplayValues];
+    }
+    return statusDisplayValues;
+  }, [statusDisplayValues, status]);
+
+  const statusHasMore = filteredStatusValues.length > 3 && !statusSearch.trim();
+
+  const filteredCategoryValues = useMemo(() => {
+    const base = CATEGORY_NAMES;
+    const query = categorySearch.trim().toLowerCase();
+    if (!query) return base;
+    return base.filter((value) => value.toLowerCase().includes(query));
+  }, [categorySearch]);
+
+  const categoryDisplayValues = useMemo(() => {
+    if (categorySearch.trim() || categoryShowAll) return filteredCategoryValues;
+    return filteredCategoryValues.slice(0, 3);
+  }, [filteredCategoryValues, categorySearch, categoryShowAll]);
+
+  const categoryRenderValues = useMemo(() => {
+    if (category && category !== "all" && !categoryDisplayValues.includes(category)) {
+      return [category, ...categoryDisplayValues];
+    }
+    return categoryDisplayValues;
+  }, [categoryDisplayValues, category]);
+
+  const categoryHasMore = filteredCategoryValues.length > 3 && !categorySearch.trim();
+
+  const filteredPriorityValues = useMemo(() => {
+    const base = Array.from(PRIORITY_VALUES);
+    const query = prioritySearch.trim().toLowerCase();
+    if (!query) return base;
+    return base.filter((value) => {
+      const label = tr(lang, `complaints.filters.priority.${value}`).toLowerCase();
+      return label.includes(query) || value.toLowerCase().includes(query);
+    });
+  }, [prioritySearch, lang]);
+
+  const priorityDisplayValues = useMemo(() => {
+    if (prioritySearch.trim() || priorityShowAll) return filteredPriorityValues;
+    return filteredPriorityValues.slice(0, 3);
+  }, [filteredPriorityValues, prioritySearch, priorityShowAll]);
+
+  const priorityRenderValues = useMemo(() => {
+    if (priority !== "all" && priority && !priorityDisplayValues.includes(priority)) {
+      return [priority, ...priorityDisplayValues];
+    }
+    return priorityDisplayValues;
+  }, [priorityDisplayValues, priority]);
+
+  const priorityHasMore = filteredPriorityValues.length > 3 && !prioritySearch.trim();
+
   return (
     <Card>
       <CardContent className="grid gap-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
           <div className="flex flex-1 flex-wrap gap-2">
             <Input className="w-full sm:w-[360px]" placeholder={tr(lang, "complaints.filters.searchPlaceholder")} value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} />
-            <Select value={status} onValueChange={(v) => { setPage(1); setStatus(v); }}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.status")} /></SelectTrigger>
-              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+            <Select
+              value={status}
+              onValueChange={(v) => {
+                setPage(1);
+                setStatus(v as "all" | StatusValue);
+              }}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setStatusSearch("");
+                  setStatusShowAll(false);
+                }
+              }}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder={tr(lang, "complaints.filters.status")} />
+              </SelectTrigger>
+              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
+                <div className="px-2 pb-1">
+                  <Input
+                    autoFocus
+                    value={statusSearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setStatusSearch(value);
+                      setStatusShowAll(Boolean(value.trim()));
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder={tr(lang, "complaints.filters.dropdownSearchPlaceholder")}
+                    className="h-8"
+                  />
+                </div>
                 <SelectItem value="all">{tr(lang, "complaints.filters.status.all")}</SelectItem>
-                <SelectItem value="open">{tr(lang, "complaints.filters.status.open")}</SelectItem>
-                <SelectItem value="in_progress">{tr(lang, "complaints.filters.status.inProgress")}</SelectItem>
-                <SelectItem value="assigned">{tr(lang, "complaints.filters.status.assigned")}</SelectItem>
-                <SelectItem value="resolved">{tr(lang, "complaints.filters.status.resolved")}</SelectItem>
-                <SelectItem value="closed">{tr(lang, "complaints.filters.status.closed")}</SelectItem>
+                {statusRenderValues.length > 0 ? (
+                  <>
+                    {statusRenderValues.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {tr(lang, `complaints.filters.status.${getStatusKey(value)}`)}
+                      </SelectItem>
+                    ))}
+                    {statusHasMore && !statusShowAll && (
+                      <div
+                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setStatusShowAll(true);
+                        }}
+                      >
+                        <ChevronDown className="size-4" />
+                        {tr(lang, "complaints.filters.dropdownViewMore")} ({filteredStatusValues.length - 3})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    {tr(lang, "complaints.filters.dropdownEmpty")}
+                  </div>
+                )}
               </SelectContent>
             </Select>
-            <Select value={category} onValueChange={(v) => { setPage(1); setCategory(v); }}>
+            <Select
+              value={category}
+              onValueChange={(v) => {
+                setPage(1);
+                setCategory(v as "" | "all" | CategoryName);
+              }}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setCategorySearch("");
+                  setCategoryShowAll(false);
+                }
+              }}
+            >
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder={tr(lang, "complaints.filters.category")} />
               </SelectTrigger>
-              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
+                <div className="px-2 pb-1">
+                  <Input
+                    autoFocus
+                    value={categorySearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCategorySearch(value);
+                      setCategoryShowAll(Boolean(value.trim()));
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder={tr(lang, "complaints.filters.dropdownSearchPlaceholder")}
+                    className="h-8"
+                  />
+                </div>
                 <SelectItem value="all">
                   {tr(lang, "complaints.filters.category.all")}
                 </SelectItem>
-                {fixedCategories.map((cat) => (
-                  <SelectItem key={cat.name} value={cat.name}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
+                {categoryRenderValues.length > 0 ? (
+                  <>
+                    {categoryRenderValues.map((name) => (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                    {categoryHasMore && !categoryShowAll && (
+                      <div
+                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setCategoryShowAll(true);
+                        }}
+                      >
+                        <ChevronDown className="size-4" />
+                        {tr(lang, "complaints.filters.dropdownViewMore")} ({filteredCategoryValues.length - 3})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    {tr(lang, "complaints.filters.dropdownEmpty")}
+                  </div>
+                )}
               </SelectContent>
             </Select>
-            <Select value={priority} onValueChange={(v) => { setPage(1); setPriority(v); }}>
-              <SelectTrigger className="w-[140px]"><SelectValue placeholder={tr(lang, "complaints.filters.priority")} /></SelectTrigger>
-              <SelectContent side="top" sideOffset={8} avoidCollisions={false}>
+            <Select
+              value={priority}
+              onValueChange={(v) => {
+                setPage(1);
+                setPriority(v as "" | "all" | PriorityValue);
+              }}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setPrioritySearch("");
+                  setPriorityShowAll(false);
+                }
+              }}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder={tr(lang, "complaints.filters.priority")} />
+              </SelectTrigger>
+              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
+                <div className="px-2 pb-1">
+                  <Input
+                    autoFocus
+                    value={prioritySearch}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPrioritySearch(value);
+                      setPriorityShowAll(Boolean(value.trim()));
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    placeholder={tr(lang, "complaints.filters.dropdownSearchPlaceholder")}
+                    className="h-8"
+                  />
+                </div>
                 <SelectItem value="all">{tr(lang, "complaints.filters.priority.all")}</SelectItem>
-                <SelectItem value="low">{tr(lang, "complaints.filters.priority.low")}</SelectItem>
-                <SelectItem value="medium">{tr(lang, "complaints.filters.priority.medium")}</SelectItem>
-                <SelectItem value="high">{tr(lang, "complaints.filters.priority.high")}</SelectItem>
-                <SelectItem value="urgent">{tr(lang, "complaints.filters.priority.urgent")}</SelectItem>
+                {priorityRenderValues.length > 0 ? (
+                  <>
+                    {priorityRenderValues.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {tr(lang, `complaints.filters.priority.${value}`)}
+                      </SelectItem>
+                    ))}
+                    {priorityHasMore && !priorityShowAll && (
+                      <div
+                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setPriorityShowAll(true);
+                        }}
+                      >
+                        <ChevronDown className="size-4" />
+                        {tr(lang, "complaints.filters.dropdownViewMore")} ({filteredPriorityValues.length - 3})
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    {tr(lang, "complaints.filters.dropdownEmpty")}
+                  </div>
+                )}
               </SelectContent>
             </Select>
           </div>
