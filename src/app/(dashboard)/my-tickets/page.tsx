@@ -25,11 +25,13 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { User } from "@/lib/types";
+import { getTicketStatusLabel } from "@/lib/status";
 
 export default function MyTicketsPage() {
   const { lang } = useLanguage();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("assigned");
+  const [statusInitialized, setStatusInitialized] = useState(false);
   const [assignContext, setAssignContext] = useState<{ ticketIds: string[]; description?: string } | null>(null);
   const [selectedMember, setSelectedMember] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
@@ -37,6 +39,17 @@ export default function MyTicketsPage() {
 
   const { data: currentUser } = useSWR("current-user", getCurrentUser, { revalidateOnFocus: false });
   const isTeamLead = currentUser?.teams?.some((t) => t.isLeader) ?? false;
+
+  useEffect(() => {
+    if (statusInitialized) return;
+    if (isTeamLead) {
+      setStatus("open");
+      setStatusInitialized(true);
+    } else if (currentUser) {
+      setStatus("assigned");
+      setStatusInitialized(true);
+    }
+  }, [isTeamLead, currentUser, statusInitialized]);
 
   const statusFilterParam = status === "all" ? undefined : status;
   const { data, isLoading, mutate } = useSWR(
@@ -230,6 +243,11 @@ export default function MyTicketsPage() {
                   <SelectItem value="all">
                     {tr(lang, "teamTickets.filters.status.all")}
                   </SelectItem>
+                  {isTeamLead && (
+                    <SelectItem value="open">
+                      {tr(lang, "teamTickets.filters.status.open")}
+                    </SelectItem>
+                  )}
                   <SelectItem value="assigned">
                     {tr(lang, "teamTickets.filters.status.assigned")}
                   </SelectItem>
@@ -315,6 +333,7 @@ export default function MyTicketsPage() {
                 {filteredTickets.map((ticket) => {
                   const isUnassigned = !ticket.assignedUser;
                   const isSelected = selectedTickets.includes(ticket.id);
+                  const statusLabel = getTicketStatusLabel(lang, ticket.status);
                   return (
                   <TableRow key={ticket.id}>
                     <TableCell className="w-10 text-center">
@@ -393,7 +412,7 @@ export default function MyTicketsPage() {
                           "bg-neutral-500/15 text-neutral-700 dark:text-neutral-300"
                         }
                       >
-                        {ticket.status.replace("_", " ")}
+                        {statusLabel || ticket.status.replace("_", " ")}
                       </Badge>
                     </TableCell>
                     <TableCell>

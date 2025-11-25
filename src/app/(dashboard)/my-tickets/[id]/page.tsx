@@ -55,6 +55,7 @@ import { formatDateTimeSmart } from "@/lib/utils";
 import { Ticket, User } from "@/lib/types";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
+import { getTicketStatusLabel } from "@/lib/status";
 
 type ProofAttachment = { id: string; file: File; previewUrl: string; name: string };
 
@@ -62,7 +63,7 @@ type ProofAttachment = { id: string; file: File; previewUrl: string; name: strin
 const fetcher = (url: string) => api.get(url).then(res => res.data);
 
 // Status badge helper function
-const getStatusBadge = (status: string | undefined) => {
+const getStatusBadge = (status: string | undefined, lang: "en" | "hi" | "mr") => {
   if (!status) {
     return (
       <Badge variant="secondary" className="bg-gray-500/15 text-gray-700 dark:text-gray-300">
@@ -83,9 +84,11 @@ const getStatusBadge = (status: string | undefined) => {
   
   const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.open;
 
+  const label = getTicketStatusLabel(lang, status);
+
   return (
     <Badge variant={config.variant} className={config.className}>
-      {status.replace("_", " ").toUpperCase()}
+      {label || status.replace("_", " ")}
     </Badge>
   );
 };
@@ -210,7 +213,9 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
   const isClosed = !!ticket && ticket.status === 'closed';
   const assignedTeamCount = ticket?.assignedTeams?.length ?? 0;
   const primaryTeam = myTeamData?.team || myTeamData?.teams?.[0];
-  const primaryTeamId = (primaryTeam as { _id?: string; id?: string } | undefined)?._id || (primaryTeam as { _id?: string; id?: string } | undefined)?.id;
+  const primaryTeamId =
+    (primaryTeam as { _id?: string; id?: string } | undefined)?._id ||
+    (primaryTeam as { _id?: string; id?: string } | undefined)?.id;
   const currentUserId =
     (currentUser as User | undefined)?.id || (currentUser as User | undefined)?._id;
 
@@ -222,13 +227,19 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
       (ticket.assignedUser as { id?: string }).id === currentUserId);
 
   const isLeaderForTicketTeam =
-    !!primaryTeamId &&
-    !!ticket?.assignedTeams?.some(
-      (t) => (t as { _id?: string; id?: string })._id === primaryTeamId || (t as { _id?: string; id?: string }).id === primaryTeamId
-    );
+    !!leaderTeamId &&
+    !!ticket?.assignedTeams?.some((t) => {
+      const teamId = (t as { _id?: string; id?: string })._id || (t as { _id?: string; id?: string }).id;
+      return teamId === leaderTeamId;
+    });
 
-  const canUpdateStatus = !!ticket && (isAssignedUser || isLeaderForTicketTeam);
-  const canAssignMember = !!ticket && !ticket.assignedUser && isTeamLead && ticket.status !== 'resolved' && ticket.status !== 'closed';
+  const canUpdateStatus = !!ticket && isAssignedUser;
+  const canAssignMember =
+    !!ticket &&
+    !ticket.assignedUser &&
+    isLeaderForTicketTeam &&
+    ticket.status !== 'resolved' &&
+    ticket.status !== 'closed';
 
   // Split attachments into those uploaded by citizens vs team members (staff/team leads).
   // Use the uploadedByRole field from the API to determine the category.
@@ -606,7 +617,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                           : 'Category'}
                       </Badge>
                     )}
-                    {getStatusBadge(ticket?.status)}
+                    {getStatusBadge(ticket?.status, lang)}
                   </div>
                   
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -820,7 +831,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               <div className="p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">{tr(lang, "ticketDetail.currentStatus")}</span>
-                  {getStatusBadge(ticket.status)}
+                  {getStatusBadge(ticket.status, lang)}
                 </div>
                 {/* Removed created/updated timestamp from this card as requested */}
               </div>
