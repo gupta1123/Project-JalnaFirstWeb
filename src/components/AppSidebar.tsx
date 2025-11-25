@@ -60,7 +60,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
   // Check if user is a team lead directly from user object
   const userRole = currentUser?.role || "user";
-  const isTeamLead = currentUser?.teams?.some(team => team.isLeader) || false;
+  const userTeams = currentUser?.teams ?? [];
+  const leadingTeams = userTeams.filter(team => team.isLeader);
+  const memberTeams = userTeams.filter(team => !team.isLeader);
+  const isTeamLead = leadingTeams.length > 0;
   const navigationData = getNavigationData(userRole, isTeamLead);
 
 
@@ -72,6 +75,16 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         : "sidebar.panel.staff"
       : "sidebar.panel.admin";
   const panelTitle = tr(lang, panelTitleKey);
+
+  const teamContextLabel = (() => {
+    const relevantTeams = leadingTeams.length > 0 ? leadingTeams : memberTeams;
+
+    if (relevantTeams.length === 0) return null;
+
+    const teamNames = relevantTeams.map(team => team.name).filter(Boolean).join(", ");
+
+    return teamNames || null;
+  })();
 
   return (
     <Sidebar {...props}>
@@ -86,6 +99,9 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">Maza Jalna</span>
                   <span className="truncate text-xs">{panelTitle}</span>
+                  {teamContextLabel && (
+                    <span className="truncate text-[10px] text-muted-foreground">{teamContextLabel}</span>
+                  )}
                 </div>
               </Link>
             </SidebarMenuButton>

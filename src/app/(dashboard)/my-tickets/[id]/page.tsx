@@ -873,27 +873,54 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                         key={proofInputKey}
                         type="file"
                         accept="image/*"
+                        multiple
                         className="sr-only"
                         id={`file-input-${proofInputKey}`}
                         onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) {
+                          const files = Array.from(e.target.files ?? []);
+                          if (files.length === 0) {
                             setProofInputKey((k) => k + 1);
                             return;
                           }
-                          if (!file.type.startsWith("image/")) {
-                            toast.error(tr(lang, "ticketDetail.pleaseUploadImage"));
-                            setProofInputKey((k) => k + 1);
-                            return;
-                          }
-                          if (proofFiles.length >= 3) {
+
+                          const availableSlots = Math.max(0, 3 - proofFiles.length);
+                          if (availableSlots === 0) {
                             toast.error(tr(lang, "ticketDetail.maxProofReached"));
                             setProofInputKey((k) => k + 1);
                             return;
                           }
-                          const previewUrl = URL.createObjectURL(file);
-                          const id = `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                          setProofFiles((prev) => [...prev, { id, file, previewUrl, name: file.name }]);
+
+                          const acceptedFiles: File[] = [];
+                          files.forEach((file) => {
+                            if (!file.type.startsWith("image/")) {
+                              toast.error(tr(lang, "ticketDetail.pleaseUploadImage"));
+                              return;
+                            }
+                            if (acceptedFiles.length >= availableSlots) {
+                              return;
+                            }
+                            acceptedFiles.push(file);
+                          });
+
+                          if (acceptedFiles.length === 0) {
+                            setProofInputKey((k) => k + 1);
+                            return;
+                          }
+
+                          setProofFiles((prev) => [
+                            ...prev,
+                            ...acceptedFiles.map((file) => ({
+                              id: `proof-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                              file,
+                              previewUrl: URL.createObjectURL(file),
+                              name: file.name,
+                            })),
+                          ]);
+
+                          if (acceptedFiles.length < files.length || availableSlots < files.length) {
+                            toast.error(tr(lang, "ticketDetail.maxProofReached"));
+                          }
+
                           setProofInputKey((k) => k + 1);
                         }}
                       />
