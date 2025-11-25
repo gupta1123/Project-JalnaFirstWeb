@@ -1154,7 +1154,7 @@ const messages: Record<Lang, Messages> = {
     "complaints.filters.status.all": "सभी स्थितियाँ",
     "complaints.filters.status.open": "खुला",
     "complaints.filters.status.inProgress": "प्रगति पर",
-    "complaints.filters.status.assigned": "असाइन",
+    "complaints.filters.status.assigned": "सौंपा गया",
     "complaints.filters.status.resolved": "सुलझा",
     "complaints.filters.status.closed": "बंद",
     "complaints.filters.category": "श्रेणी",
@@ -1198,7 +1198,7 @@ const messages: Record<Lang, Messages> = {
     "complaints.priority.urgent": "तत्काल",
     "complaints.status.open": "खुला",
     "complaints.status.inProgress": "प्रगति पर",
-    "complaints.status.assigned": "असाइन",
+    "complaints.status.assigned": "सौंपा गया",
     "complaints.status.resolved": "सुलझा",
     "complaints.status.closed": "बंद",
 
