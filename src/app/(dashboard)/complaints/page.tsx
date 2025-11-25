@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { adminGetTickets } from "@/lib/api";
+import { adminGetTickets, getCategories } from "@/lib/api";
 import type { Ticket } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -19,61 +19,19 @@ import { tr } from "@/lib/i18n";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronDown } from "lucide-react";
 
-const FIXED_CATEGORIES = [
-  {
-    name: "Public Safety",
-    subcategories: [
-      "Law and Order",
-      "Robbery and Theft",
-      "Accident",
-      "Stampede",
-      "Sound Pollution",
-    ],
-  },
-  {
-    name: "Infrastructure and Roads",
-    subcategories: [
-      "Potholes",
-      "Incomplete Roads",
-      "Streetlights",
-      "Encroachment",
-      "Tree Cutting",
-      "Black Spots",
-    ],
-  },
-  {
-    name: "Sanitation and Utilities",
-    subcategories: [
-      "Open Gutters and Manholes",
-      "Sewer Choke",
-      "Water Leakage or No Supply",
-      "Solid Waste Missed Pickup",
-      "Public Toilets",
-    ],
-  },
-  {
-    name: "Traffic and Transport",
-    subcategories: [
-      "Illegal Parking",
-      "Traffic Congestion",
-    ],
-  },
-  {
-    name: "Livelihood and Local Order",
-    subcategories: [
-      "Hawkers Non Designated",
-      "Stray Animals",
-    ],
-  },
+const FALLBACK_CATEGORY_NAMES = [
+  "Public Safety",
+  "Infrastructure and Roads",
+  "Sanitation and Utilities",
+  "Traffic and Transport",
+  "Livelihood and Local Order",
 ] as const;
-
-const CATEGORY_NAMES = FIXED_CATEGORIES.map((cat) => cat.name);
 const STATUS_VALUES = ["open", "in_progress", "assigned", "resolved", "closed"] as const;
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 
 type StatusValue = (typeof STATUS_VALUES)[number];
 type PriorityValue = (typeof PRIORITY_VALUES)[number];
-type CategoryName = (typeof CATEGORY_NAMES)[number];
+type CategoryOption = { id: string; name: string };
 
 export default function ComplaintsPage() {
   const { lang } = useLanguage();
@@ -83,7 +41,7 @@ export default function ComplaintsPage() {
   const [limit] = useState(15);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | StatusValue>("open");
-  const [category, setCategory] = useState<"" | "all" | CategoryName>("");
+  const [category, setCategory] = useState<string>("");
   const [priority, setPriority] = useState<"" | "all" | PriorityValue>("");
   const [statusSearch, setStatusSearch] = useState("");
   const [statusShowAll, setStatusShowAll] = useState(false);
@@ -91,16 +49,48 @@ export default function ComplaintsPage() {
   const [categoryShowAll, setCategoryShowAll] = useState(false);
   const [prioritySearch, setPrioritySearch] = useState("");
   const [priorityShowAll, setPriorityShowAll] = useState(false);
+  const {
+    data: categoriesResponse,
+    isValidating: categoriesRevalidating,
+    mutate: refetchCategories,
+    error: categoriesError,
+  } = useSWR(
+    "complaints-categories",
+    () => getCategories({ page: 1, limit: 100 }),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+  const categoriesForFilter = categoriesResponse?.categories;
+  const categoryOptions = useMemo<CategoryOption[]>(() => {
+    if (Array.isArray(categoriesForFilter) && categoriesForFilter.length > 0) {
+      const unique = new Map<string, CategoryOption>();
+      categoriesForFilter.forEach((cat) => {
+        const name = typeof cat?.name === "string" ? cat.name.trim() : "";
+        const id = (cat?.id || (cat as { _id?: string })?._id || "").trim();
+        if (!name || !id || unique.has(id)) return;
+        unique.set(id, { id, name });
+      });
+      return Array.from(unique.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      );
+    }
+    if (categoriesError) {
+      return FALLBACK_CATEGORY_NAMES.map((name) => ({ id: name, name }));
+    }
+    return [];
+  }, [categoriesForFilter, categoriesError]);
+  const categoriesLoading =
+    !categoriesError &&
+    (!categoriesForFilter || categoriesRevalidating) &&
+    categoryOptions.length === 0;
   const params = useMemo(() => {
     const allowed = new Set(["open", "in_progress", "assigned", "resolved", "closed"]);
     const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
     if (search && search.trim()) p.search = search.trim();
     if (status && allowed.has(status)) p.status = status;
     if (category && category !== "all") {
-      // Backend expects category names without underscores in the query param.
-      // We keep the internal values (with underscores) for enums/translations,
-      // and only normalize when sending to the API.
-      p.category = category.replace(/_/g, " ");
+      p.category = category;
     }
     if (priority && priority !== "all") p.priority = priority;
     return p;
@@ -176,11 +166,11 @@ export default function ComplaintsPage() {
   const statusHasMore = filteredStatusValues.length > 3 && !statusSearch.trim();
 
   const filteredCategoryValues = useMemo(() => {
-    const base = CATEGORY_NAMES;
+    const base = categoryOptions;
     const query = categorySearch.trim().toLowerCase();
     if (!query) return base;
-    return base.filter((value) => value.toLowerCase().includes(query));
-  }, [categorySearch]);
+    return base.filter((option) => option.name.toLowerCase().includes(query));
+  }, [categorySearch, categoryOptions]);
 
   const categoryDisplayValues = useMemo(() => {
     if (categorySearch.trim() || categoryShowAll) return filteredCategoryValues;
@@ -188,11 +178,18 @@ export default function ComplaintsPage() {
   }, [filteredCategoryValues, categorySearch, categoryShowAll]);
 
   const categoryRenderValues = useMemo(() => {
-    if (category && category !== "all" && !categoryDisplayValues.includes(category)) {
-      return [category, ...categoryDisplayValues];
+    if (
+      category &&
+      category !== "all" &&
+      !categoryDisplayValues.some((option) => option.id === category)
+    ) {
+      const selectedOption = categoryOptions.find((option) => option.id === category);
+      if (selectedOption) {
+        return [selectedOption, ...categoryDisplayValues];
+      }
     }
     return categoryDisplayValues;
-  }, [categoryDisplayValues, category]);
+  }, [categoryDisplayValues, categoryOptions, category]);
 
   const categoryHasMore = filteredCategoryValues.length > 3 && !categorySearch.trim();
 
@@ -290,10 +287,12 @@ export default function ComplaintsPage() {
               value={category}
               onValueChange={(v) => {
                 setPage(1);
-                setCategory(v as "" | "all" | CategoryName);
+                setCategory(v);
               }}
               onOpenChange={(open) => {
-                if (!open) {
+                if (open) {
+                  void refetchCategories();
+                } else {
                   setCategorySearch("");
                   setCategoryShowAll(false);
                 }
@@ -320,11 +319,15 @@ export default function ComplaintsPage() {
                 <SelectItem value="all">
                   {tr(lang, "complaints.filters.category.all")}
                 </SelectItem>
-                {categoryRenderValues.length > 0 ? (
+                {categoriesLoading ? (
+                  <div className="px-2 py-3 text-sm text-muted-foreground">
+                    {tr(lang, "login.loading")}
+                  </div>
+                ) : categoryRenderValues.length > 0 ? (
                   <>
-                    {categoryRenderValues.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {categoryRenderValues.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
                       </SelectItem>
                     ))}
                     {categoryHasMore && !categoryShowAll && (

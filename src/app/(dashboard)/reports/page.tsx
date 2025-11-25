@@ -12,9 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr, type Lang } from "@/lib/i18n";
-import { getCurrentUser, getAdminTeamStats } from "@/lib/api";
+import { getCurrentUser, getAdminTeamStats, getCategories } from "@/lib/api";
 import type { AdminTeamStatsResponse, TicketStatusTotals, TeamMemberStat } from "@/lib/types";
-import { AlertCircle, BarChart3, RefreshCw, TrendingUp, Activity, CheckCircle2, FileText, MapPin, ChevronDown } from "lucide-react";
+import { AlertCircle, BarChart3, RefreshCw, TrendingUp, Activity, CheckCircle2, FileText } from "lucide-react";
 import { 
   BarChart, 
   Bar, 
@@ -100,6 +100,16 @@ const createTicketTotals = (): TicketStatusTotals => ({
   total: 0,
 });
 
+const aggregateTeamTotals = (teams: AdminTeamStatsResponse["teams"]): TicketStatusTotals => {
+  return teams.reduce((acc, entry) => {
+    TICKET_TOTAL_FIELDS.forEach((field) => {
+      acc[field] = (acc[field] || 0) + (entry.teamStats[field] || 0);
+    });
+    acc.total += entry.teamStats.total || 0;
+    return acc;
+  }, createTicketTotals());
+};
+
 export default function ReportsPage() {
   const { lang } = useLanguage();
   const { data: currentUser, isLoading: loadingUser } = useSWR("current-user", getCurrentUser, {
@@ -111,11 +121,7 @@ export default function ReportsPage() {
   useEffect(() => setIsMounted(true), []);
 
   const [dateRange, setDateRange] = useState<DateRangeState>(createDefaultDateRange);
-  const [selectedTeamId, setSelectedTeamId] = useState<string | "all">("all");
-  const [teamSearch, setTeamSearch] = useState("");
-  const [selectedAreaKey, setSelectedAreaKey] = useState<string>("all");
-  const [showAllTeams, setShowAllTeams] = useState(false);
-  const [selectOpen, setSelectOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("all");
   const isAdmin = currentUser?.role === "admin" || currentUser?.role === "superadmin";
 
   const statsKey = isAdmin
@@ -139,17 +145,45 @@ export default function ReportsPage() {
     }
   );
 
+  const {
+    data: categoriesData,
+    isLoading: loadingCategories,
+  } = useSWR(["reports-categories", 1, 100], () =>
+    getCategories({
+      page: 1,
+      limit: 100,
+    }),
+    {
+      revalidateOnFocus: false,
+    }
+  );
+
+  const categoryOptions = categoriesData?.categories ?? [];
+
+  const filteredTeams = useMemo<AdminTeamStatsResponse["teams"]>(() => {
+    if (!statsData?.teams) return [];
+    if (selectedCategoryId === "all") return statsData.teams;
+
+    const selectedCategory = categoryOptions.find((category) => category.id === selectedCategoryId);
+    const categoryTeamId = selectedCategory?.team?._id ?? (selectedCategory?.team as { id?: string } | undefined)?.id;
+
+    if (!categoryTeamId) {
+      return [];
+    }
+
+    return statsData.teams.filter((teamEntry) => teamEntry.team.id === categoryTeamId);
+  }, [statsData?.teams, selectedCategoryId, categoryOptions]);
+
   // Metrics Calculation
   const selectedData = useMemo(() => {
-    const baseTotals = statsData?.overallTotals;
-    const teamData = statsData?.teams.find(t => t.team.id === selectedTeamId);
     const unassignedLabel = tr(lang, "reports.table.unassigned");
-    const unassignedBacklogLabel = tr(lang, "reports.table.unassignedBacklog");
     const unknownLabel = tr(lang, "reports.table.unknown");
-    
-    const totals = selectedTeamId === "all" ? baseTotals : teamData?.teamStats;
-    
-    if (!totals) return null;
+    const activeTeam = filteredTeams.length === 1 ? filteredTeams[0] : null;
+    const totals = activeTeam
+      ? activeTeam.teamStats
+      : filteredTeams.length > 0
+        ? aggregateTeamTotals(filteredTeams)
+        : createTicketTotals();
 
     const total = totals.total || 0;
     const resolved = (totals.resolved || 0) + (totals.closed || 0);
@@ -164,11 +198,11 @@ export default function ReportsPage() {
 
     // Chart Data: Comparisons (Grouped Bar: Open vs WIP vs Resolved)
     let barData = [];
-    let membersList: TeamMemberStat[] = teamData?.members ?? [];
+    let membersList: TeamMemberStat[] = activeTeam?.members ?? [];
 
-    if (selectedTeamId === "all") {
+    if (!activeTeam) {
       // Compare Teams - show all statuses
-      barData = (statsData?.teams || [])
+      barData = filteredTeams
         .map(t => ({
           name: t.team.name,
           open: t.teamStats.open || 0,
@@ -179,7 +213,7 @@ export default function ReportsPage() {
           total: t.teamStats.total || 0
         }))
         .sort((a, b) => b.total - a.total)
-        .slice(0, 6); // Top 6 teams
+        .slice(0, 6); // Top teams
     } else {
       // Calculate Unassigned Tickets
       const memberTotals = membersList.reduce<StatusSummary>((acc, m) => {
@@ -247,20 +281,22 @@ export default function ReportsPage() {
         .slice(0, 10); // Top 10 items
     }
 
-    const sortedMembers = [...membersList].sort((a, b) => {
-      const isUnassignedA = a.member.id === "unassigned";
-      const isUnassignedB = b.member.id === "unassigned";
-      if (isUnassignedA && !isUnassignedB) return 1;
-      if (!isUnassignedA && isUnassignedB) return -1;
+    const sortedMembers = activeTeam
+      ? [...membersList].sort((a, b) => {
+          const isUnassignedA = a.member.id === "unassigned";
+          const isUnassignedB = b.member.id === "unassigned";
+          if (isUnassignedA && !isUnassignedB) return 1;
+          if (!isUnassignedA && isUnassignedB) return -1;
 
-      const nameA = (a.member.fullName || `${a.member.firstName ?? ""} ${a.member.lastName ?? ""}` || a.member.email || "").trim().toLowerCase();
-      const nameB = (b.member.fullName || `${b.member.firstName ?? ""} ${b.member.lastName ?? ""}` || b.member.email || "").trim().toLowerCase();
+          const nameA = (a.member.fullName || `${a.member.firstName ?? ""} ${a.member.lastName ?? ""}` || a.member.email || "").trim().toLowerCase();
+          const nameB = (b.member.fullName || `${b.member.firstName ?? ""} ${b.member.lastName ?? ""}` || b.member.email || "").trim().toLowerCase();
 
-      if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
-      if (nameA) return -1;
-      if (nameB) return 1;
-      return 0;
-    });
+          if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+          if (nameA) return -1;
+          if (nameB) return 1;
+          return 0;
+        })
+      : [];
 
     return {
       total,
@@ -268,13 +304,14 @@ export default function ReportsPage() {
       inProgress,
       pieData,
       barData,
-      members: sortedMembers
+      members: sortedMembers,
+      isSingleTeam: Boolean(activeTeam),
     };
-  }, [statsData, selectedTeamId, lang]);
+  }, [filteredTeams, lang]);
 
   const sortedTeamsForTable = useMemo(() => {
-    if (!statsData?.teams) return [];
-    return [...statsData.teams].sort((a, b) => {
+    if (!filteredTeams.length) return [];
+    return [...filteredTeams].sort((a, b) => {
       const nameA = a.team.name?.trim().toLowerCase() ?? "";
       const nameB = b.team.name?.trim().toLowerCase() ?? "";
       if (nameA && nameB) return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
@@ -282,30 +319,7 @@ export default function ReportsPage() {
       if (nameB) return 1;
       return 0;
     });
-  }, [statsData?.teams]);
-
-  const filteredTeams = useMemo(() => {
-    if (!teamSearch.trim()) return sortedTeamsForTable;
-    const query = teamSearch.trim().toLowerCase();
-    return sortedTeamsForTable.filter((team) => team.team.name?.toLowerCase().includes(query));
-  }, [teamSearch, sortedTeamsForTable]);
-
-  // Teams to display - show only 3 if not expanded and not searching
-  const displayTeams = useMemo(() => {
-    const hasSearch = teamSearch.trim().length > 0;
-    if (hasSearch || showAllTeams) {
-      return filteredTeams;
-    }
-    return filteredTeams.slice(0, 3);
-  }, [filteredTeams, teamSearch, showAllTeams]);
-
-  const hasMoreTeams = filteredTeams.length > 3 && !teamSearch.trim();
-
-  const selectedTeamLabel = useMemo(() => {
-    if (selectedTeamId === "all") return tr(lang, "reports.overview.title");
-    const team = statsData?.teams.find(t => t.team.id === selectedTeamId);
-    return team?.team.name || tr(lang, "reports.teamLabel");
-  }, [selectedTeamId, statsData, lang]);
+  }, [filteredTeams]);
 
   const handleDateChange = (field: keyof DateRangeState, value: string) => {
     setDateRange((prev) => {
@@ -354,73 +368,30 @@ export default function ReportsPage() {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:items-center sm:justify-end">
-           <div className="w-full sm:w-auto sm:min-w-[260px] sm:max-w-[360px]">
-            <Select 
-              value={selectedTeamId} 
-              onValueChange={setSelectedTeamId}
-              open={selectOpen}
-              onOpenChange={(open) => {
-                setSelectOpen(open);
-                if (!open) {
-                  setShowAllTeams(false);
-                  setTeamSearch("");
-                }
-              }}
-            >
-              <SelectTrigger
-                className="w-full justify-between text-left"
-                title={selectedTeamLabel}
-              >
-                <SelectValue
-                  placeholder={tr(lang, "reports.teamLabel")}
-                  className="truncate"
-                />
-              </SelectTrigger>
-              <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
-                <div className="px-2 pb-1">
-                  <Input
-                    autoFocus
-                    value={teamSearch}
-                    onChange={(e) => {
-                      setTeamSearch(e.target.value);
-                      if (e.target.value.trim()) {
-                        setShowAllTeams(true);
-                      }
-                    }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    placeholder={tr(lang, "reports.teamSearchPlaceholder")}
-                    className="h-8"
-                  />
-                </div>
-                <SelectItem value="all">{tr(lang, "reports.overview.title")}</SelectItem>
-                {displayTeams.length > 0 ? (
-                  <>
-                    {displayTeams.map((t) => (
-                      <SelectItem key={t.team.id} value={t.team.id}>
-                        {t.team.name}
-                      </SelectItem>
-                    ))}
-                    {hasMoreTeams && !showAllTeams && (
-                      <div 
-                        className="px-2 py-2 text-sm text-primary cursor-pointer hover:bg-accent rounded-sm flex items-center gap-2"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAllTeams(true);
-                        }}
-                      >
-                        <ChevronDown className="size-4" />
-                        {tr(lang, "reports.teamViewMore")} ({filteredTeams.length - 3})
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="px-2 py-3 text-sm text-muted-foreground">
-                    {tr(lang, "reports.teamSearchEmpty")}
-                  </div>
-                )}
-              </SelectContent>
-            </Select>
+           <div className="w-full sm:w-auto sm:min-w-[220px] sm:max-w-[320px]">
+             <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+               <SelectTrigger className="w-full justify-between text-left">
+                 <SelectValue placeholder={tr(lang, "reports.filters.categoryLabel")} />
+               </SelectTrigger>
+               <SelectContent side="bottom" sideOffset={8} avoidCollisions={false}>
+                 <SelectItem value="all">{tr(lang, "reports.filters.allCategories")}</SelectItem>
+                 {loadingCategories ? (
+                   <div className="px-2 py-3 text-sm text-muted-foreground">
+                     {tr(lang, "reports.filters.loadingCategories")}
+                   </div>
+                 ) : categoryOptions.length > 0 ? (
+                   categoryOptions.map((category) => (
+                     <SelectItem key={category.id} value={category.id}>
+                       {category.name}
+                     </SelectItem>
+                   ))
+                 ) : (
+                   <div className="px-2 py-3 text-sm text-muted-foreground">
+                     {tr(lang, "reports.filters.noCategories")}
+                   </div>
+                 )}
+               </SelectContent>
+             </Select>
            </div>
            <div className="flex gap-2 bg-background border rounded-md p-1">
              <Input 
@@ -541,9 +512,9 @@ export default function ReportsPage() {
                  {/* Grouped Bar Chart - Performance Matrix */}
                  <Card className="flex flex-col">
                    <CardHeader>
-                     <CardTitle className="text-base">
-                       {selectedTeamId === "all" ? tr(lang, "reports.charts.volumeByTeam") : tr(lang, "reports.charts.volumeByMember")}
-                     </CardTitle>
+                    <CardTitle className="text-base">
+                      {selectedData.isSingleTeam ? tr(lang, "reports.charts.volumeByMember") : tr(lang, "reports.charts.volumeByTeam")}
+                    </CardTitle>
                      <CardDescription>
                        {tr(lang, "reports.charts.performanceDescription")}
                      </CardDescription>
@@ -597,7 +568,7 @@ export default function ReportsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base">
-                    {selectedTeamId === "all" ? tr(lang, "reports.teams.title") : tr(lang, "reports.members.title")}
+                    {selectedData.isSingleTeam ? tr(lang, "reports.members.title") : tr(lang, "reports.teams.title")}
                   </CardTitle>
                   <CardDescription>
                     {tr(lang, "reports.table.description")}
@@ -608,7 +579,9 @@ export default function ReportsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="min-w-[150px]">{selectedTeamId === "all" ? tr(lang, "reports.teamLabel") : tr(lang, "reports.table.member")}</TableHead>
+                          <TableHead className="min-w-[150px]">
+                            {selectedData.isSingleTeam ? tr(lang, "reports.table.member") : tr(lang, "reports.teamLabel")}
+                          </TableHead>
                           {STATUS_KEYS.map((key) => (
                             <TableHead key={key} className="text-right capitalize whitespace-nowrap">
                               {tr(lang, `reports.status.${key}`)}
@@ -618,19 +591,7 @@ export default function ReportsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedTeamId === "all" ? (
-                          sortedTeamsForTable.map((t) => (
-                            <TableRow key={t.team.id}>
-                              <TableCell className="font-medium">{t.team.name}</TableCell>
-                              {STATUS_KEYS.map((key) => (
-                                <TableCell key={key} className="text-right text-muted-foreground">
-                                  {t.teamStats[key] || 0}
-                                </TableCell>
-                              ))}
-                              <TableCell className="text-right font-bold">{t.teamStats.total}</TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
+                        {selectedData.isSingleTeam ? (
                           selectedData.members.map((m) => {
                             const isUnassigned = m.member.id === "unassigned";
                             const displayName = [m.member.firstName, m.member.lastName].filter(Boolean).join(" ") || m.member.email || tr(lang, "reports.table.unknown");
@@ -651,6 +612,18 @@ export default function ReportsPage() {
                               </TableRow>
                             );
                           })
+                        ) : (
+                          sortedTeamsForTable.map((t) => (
+                            <TableRow key={t.team.id}>
+                              <TableCell className="font-medium">{t.team.name}</TableCell>
+                              {STATUS_KEYS.map((key) => (
+                                <TableCell key={key} className="text-right text-muted-foreground">
+                                  {t.teamStats[key] || 0}
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-right font-bold">{t.teamStats.total}</TableCell>
+                            </TableRow>
+                          ))
                         )}
                       </TableBody>
                     </Table>
