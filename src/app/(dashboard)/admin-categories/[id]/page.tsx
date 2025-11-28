@@ -1,13 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import useSWR from "swr";
 import { motion } from "framer-motion";
-import { getCategoryWithSubcategories } from "@/lib/api";
+import { toast } from "sonner";
+import {
+  createSubCategory,
+  deleteSubCategory,
+  getCategoryWithSubcategories,
+  updateSubCategory,
+} from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -26,15 +35,29 @@ import {
   FolderOpen,
   List,
   Eye,
+  Edit,
+  Plus,
+  Save,
+  X,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDateShort } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { SubCategory } from "@/lib/types";
 
 export default function CategoryDetailPage() {
   const params = useParams<{ id: string }>();
   const categoryId = params.id;
 
-  const { data, isLoading, error } = useSWR(
+  const { data, isLoading, error, mutate } = useSWR(
     categoryId ? `category-detail-${categoryId}` : null,
     () => categoryId ? getCategoryWithSubcategories(categoryId) : null,
     { revalidateOnFocus: false }
@@ -42,6 +65,97 @@ export default function CategoryDetailPage() {
 
   const category = data?.category;
   const subcategories = data?.subcategories || [];
+  const [isSubDialogOpen, setIsSubDialogOpen] = useState(false);
+  const [submittingSubcategory, setSubmittingSubcategory] = useState(false);
+  const [editingSubcategory, setEditingSubcategory] = useState<SubCategory | null>(null);
+  const [subcategoryForm, setSubcategoryForm] = useState({
+    name: "",
+    description: "",
+    isActive: true,
+  });
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [subcategoryToDelete, setSubcategoryToDelete] = useState<SubCategory | null>(null);
+  const [isDeletingSubcategory, setIsDeletingSubcategory] = useState(false);
+
+  const openCreateSubcategory = () => {
+    setEditingSubcategory(null);
+    setSubcategoryForm({
+      name: "",
+      description: "",
+      isActive: true,
+    });
+    setIsSubDialogOpen(true);
+  };
+
+  const openEditSubcategory = (subcategory: SubCategory) => {
+    setEditingSubcategory(subcategory);
+    setSubcategoryForm({
+      name: subcategory.name,
+      description: subcategory.description,
+      isActive: subcategory.isActive,
+    });
+    setIsSubDialogOpen(true);
+  };
+
+  const confirmDeleteSubcategory = (subcategory: SubCategory) => {
+    setSubcategoryToDelete(subcategory);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteSubcategory = async () => {
+    if (!subcategoryToDelete) return;
+    setIsDeletingSubcategory(true);
+    try {
+      await deleteSubCategory(subcategoryToDelete.id);
+      toast.success("Subcategory deleted");
+      await mutate();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete subcategory");
+    } finally {
+      setIsDeletingSubcategory(false);
+      setIsDeleteDialogOpen(false);
+      setSubcategoryToDelete(null);
+    }
+  };
+
+  const handleSubmitSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!categoryId) return;
+
+    if (!subcategoryForm.name.trim() || !subcategoryForm.description.trim()) {
+      toast.error("Please fill required fields");
+      return;
+    }
+
+    setSubmittingSubcategory(true);
+    try {
+      if (editingSubcategory) {
+        await updateSubCategory(editingSubcategory.id, {
+          name: subcategoryForm.name.trim(),
+          description: subcategoryForm.description.trim(),
+          isActive: subcategoryForm.isActive,
+        });
+        toast.success("Subcategory updated");
+      } else {
+        await createSubCategory({
+          category: categoryId,
+          name: subcategoryForm.name.trim(),
+          description: subcategoryForm.description.trim(),
+          isActive: subcategoryForm.isActive,
+        });
+        toast.success("Subcategory created");
+      }
+      setIsSubDialogOpen(false);
+      setEditingSubcategory(null);
+      await mutate();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save subcategory");
+    } finally {
+      setSubmittingSubcategory(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -120,6 +234,18 @@ export default function CategoryDetailPage() {
                   )}
                 </div>
               </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild variant="secondary" className="flex items-center gap-2">
+                <Link href={`/admin-categories/${category.id}/edit`}>
+                  <Edit className="h-4 w-4" />
+                  Edit Category
+                </Link>
+              </Button>
+              <Button onClick={openCreateSubcategory} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Subcategory
+              </Button>
             </div>
           </div>
         </motion.div>
@@ -218,13 +344,21 @@ export default function CategoryDetailPage() {
       {/* Subcategories */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <List className="h-5 w-5" />
-            Subcategories ({subcategories.length})
-          </CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Specific subcategories under this category
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Subcategories ({subcategories.length})
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Specific subcategories under this category
+              </p>
+            </div>
+            <Button variant="outline" onClick={openCreateSubcategory} className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add Subcategory
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {subcategories.length === 0 ? (
@@ -244,6 +378,7 @@ export default function CategoryDetailPage() {
                   <TableHead className="w-[150px]">Created By</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[100px]">Created</TableHead>
+                  <TableHead className="w-[140px] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -275,6 +410,26 @@ export default function CategoryDetailPage() {
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDateShort(subcategory.createdAt)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => openEditSubcategory(subcategory)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 text-destructive"
+                          onClick={() => confirmDeleteSubcategory(subcategory)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -282,6 +437,99 @@ export default function CategoryDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isSubDialogOpen} onOpenChange={(open) => {
+        setIsSubDialogOpen(open);
+        if (!open) {
+          setEditingSubcategory(null);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingSubcategory ? "Edit Subcategory" : "Add Subcategory"}</DialogTitle>
+            <DialogDescription>
+              {editingSubcategory
+                ? "Update the selected subcategory."
+                : "Create a new subcategory under this category."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmitSubcategory} className="space-y-5">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Subcategory Name *</label>
+              <Input
+                value={subcategoryForm.name}
+                onChange={(e) => setSubcategoryForm((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description *</label>
+              <Textarea
+                value={subcategoryForm.description}
+                onChange={(e) => setSubcategoryForm((prev) => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsSubDialogOpen(false)}
+                disabled={submittingSubcategory}
+                className="flex items-center gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submittingSubcategory}
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {submittingSubcategory ? "Saving..." : editingSubcategory ? "Save Changes" : "Create Subcategory"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+        setIsDeleteDialogOpen(open);
+        if (!open) setSubcategoryToDelete(null);
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete subcategory</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The subcategory will be removed permanently.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold">{subcategoryToDelete?.name}</span>?
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeletingSubcategory}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteSubcategory}
+              disabled={isDeletingSubcategory}
+            >
+              {isDeletingSubcategory ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

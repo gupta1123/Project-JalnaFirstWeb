@@ -817,9 +817,16 @@ export async function getCategoryWithSubcategories(id: string) {
 export async function createCategory(payload: {
   name: string;
   description: string;
-  team?: string;
+  team?: string | null;
+  order?: number;
+  isActive?: boolean;
 }) {
-  const res = await api.post("/api/categories", payload);
+  const { team, ...rest } = payload;
+  const body: Record<string, unknown> = { ...rest };
+  if (team !== undefined) {
+    body.team = team;
+  }
+  const res = await api.post("/api/categories", body);
   return res.data as {
     message: string;
     category: Category;
@@ -829,9 +836,16 @@ export async function createCategory(payload: {
 export async function updateCategory(id: string, payload: {
   name?: string;
   description?: string;
-  team?: string;
+  team?: string | null;
+  order?: number;
+  isActive?: boolean;
 }) {
-  const res = await api.put(`/api/categories/${id}`, payload);
+  const { team, ...rest } = payload;
+  const body: Record<string, unknown> = { ...rest };
+  if (team !== undefined) {
+    body.team = team;
+  }
+  const res = await api.put(`/api/categories/${id}`, body);
   return res.data as {
     message: string;
     category: Category;
@@ -889,6 +903,8 @@ export async function createSubCategory(payload: {
   name: string;
   description: string;
   category: string;
+  order?: number;
+  isActive?: boolean;
 }) {
   const res = await api.post("/api/subcategories", payload);
   return res.data as {
@@ -901,6 +917,8 @@ export async function updateSubCategory(id: string, payload: {
   name?: string;
   description?: string;
   category?: string;
+  order?: number;
+  isActive?: boolean;
 }) {
   const res = await api.put(`/api/subcategories/${id}`, payload);
   return res.data as {

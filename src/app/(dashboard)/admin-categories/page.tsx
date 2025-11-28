@@ -2,8 +2,9 @@
 
 import useSWR from "swr";
 import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { getCategoriesGroupedByTeam } from "@/lib/api";
+import { deleteCategory, getCategoriesGroupedByTeam } from "@/lib/api";
 import type { Category } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,22 +24,34 @@ import {
   Tags,
   Search,
   Grid3X3,
-  Users,
   Globe,
   Building2,
   Eye,
   Calendar,
   User,
   ExternalLink,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDateShort } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function AdminCategoriesPage() {
   const [search, setSearch] = useState("");
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch categories grouped by team
-  const { data, isLoading } = useSWR(
+  const { data, isLoading, mutate } = useSWR(
     "categories-grouped-by-team",
     () => getCategoriesGroupedByTeam(),
     { revalidateOnFocus: false }
@@ -83,6 +96,29 @@ export default function AdminCategoriesPage() {
 
   const globalCount = filteredCategories.filter(cat => cat.isGlobal).length;
   const teamCount = filteredCategories.filter(cat => !cat.isGlobal).length;
+
+  const openDeleteDialog = (category: { id: string; name: string }) => {
+    setCategoryToDelete(category);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+
+    setDeletingCategoryId(categoryToDelete.id);
+    try {
+      await deleteCategory(categoryToDelete.id);
+      toast.success("Category deleted successfully");
+      await mutate();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete category");
+    } finally {
+      setDeletingCategoryId(null);
+      setIsDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    }
+  };
 
   return (
     <div className="grid gap-6">
@@ -130,7 +166,7 @@ export default function AdminCategoriesPage() {
       {/* Search */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <CardTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
               Categories Overview
@@ -140,14 +176,22 @@ export default function AdminCategoriesPage() {
                 </Badge>
               )}
             </CardTitle>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search categories, teams, or creators..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10 w-80"
-              />
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search categories, teams, or creators..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              <Button asChild className="w-full sm:w-auto">
+                <Link href="/admin-categories/create" className="flex items-center justify-center">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Link>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -247,11 +291,22 @@ export default function AdminCategoriesPage() {
                       {formatDateShort(category.createdAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Link href={`/admin-categories/${category.id}`}>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <ExternalLink className="h-4 w-4" />
+                      <div className="flex justify-end gap-1">
+                        <Link href={`/admin-categories/${category.id}`}>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive"
+                          disabled={deletingCategoryId === category.id}
+                          onClick={() => openDeleteDialog({ id: category.id, name: category.name })}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      </Link>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -260,6 +315,43 @@ export default function AdminCategoriesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open);
+          if (!open) setCategoryToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete category</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. This category will be removed permanently.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm">
+            Are you sure you want to delete{" "}
+            <span className="font-semibold">{categoryToDelete?.name}</span>?
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={deletingCategoryId === categoryToDelete?.id}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteCategory}
+              disabled={deletingCategoryId === categoryToDelete?.id}
+            >
+              {deletingCategoryId === categoryToDelete?.id ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
