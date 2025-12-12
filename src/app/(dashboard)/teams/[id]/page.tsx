@@ -520,11 +520,24 @@ function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
 
 function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffIds, lang }: { team: Team; allStaff: User[]; onAddMember: (employeeId: string) => Promise<void>; submitting: boolean; assignedStaffIds: Set<string>; lang: "en" | "hi" | "mr"; }) {
   const [selectedStaff, setSelectedStaff] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
   const availableStaff = allStaff.filter(s => 
     s.role === "staff" && 
     !team.employees.some(m => m._id === s._id) && // Not already in current team
     !assignedStaffIds.has(s._id) // Not assigned to any other team
   );
+
+  const filteredStaff = useMemo(() => {
+    if (!searchQuery.trim()) return availableStaff;
+    const searchLower = searchQuery.toLowerCase();
+    return availableStaff.filter((staff) =>
+      [staff.fullName, staff.email, staff.firstName, staff.lastName]
+        .filter(Boolean)
+        .some((field) => field!.toLowerCase().includes(searchLower))
+    );
+  }, [availableStaff, searchQuery]);
+
+  const selectedStaffMember = availableStaff.find(s => s._id === selectedStaff);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -536,22 +549,53 @@ function AddMemberForm({ team, allStaff, onAddMember, submitting, assignedStaffI
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
         <Label>{tr(lang, "teamDetail.addMember.selectLabel")}</Label>
-        <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-          <SelectTrigger>
-            <SelectValue placeholder={tr(lang, "teamDetail.addMember.placeholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            {availableStaff.length === 0 ? (
-              <div className="px-2 py-1.5 text-sm text-muted-foreground">{tr(lang, "teamDetail.addMember.noAvailable")}</div>
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search staff by name or email..."
+            disabled={submitting}
+          />
+          <div className="max-h-56 overflow-y-auto space-y-2">
+            {filteredStaff.length === 0 ? (
+              <div className="text-center text-xs text-muted-foreground py-4">
+                {searchQuery.trim() 
+                  ? "No staff members found matching your search"
+                  : tr(lang, "teamDetail.addMember.noAvailable")}
+              </div>
             ) : (
-              availableStaff.map((staff) => (
-                <SelectItem key={staff._id} value={staff._id}>
-                  {staff.fullName} ({staff.email})
-                </SelectItem>
+              filteredStaff.map((staff) => (
+                <button
+                  key={staff._id}
+                  type="button"
+                  onClick={() => setSelectedStaff(staff._id)}
+                  disabled={submitting}
+                  className={`w-full rounded-md border px-3 py-2 text-left transition hover:border-primary hover:bg-primary/5 ${
+                    selectedStaff === staff._id 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{staff.fullName}</p>
+                      <p className="text-xs text-muted-foreground">{staff.email}</p>
+                    </div>
+                    {selectedStaff === staff._id && (
+                      <span className="text-xs font-medium text-primary">Selected</span>
+                    )}
+                  </div>
+                </button>
               ))
             )}
-          </SelectContent>
-        </Select>
+          </div>
+        </div>
+        {selectedStaffMember && (
+          <p className="text-xs text-muted-foreground">
+            Selected: {selectedStaffMember.fullName} ({selectedStaffMember.email})
+          </p>
+        )}
       </div>
       <DialogFooter>
         <DialogClose asChild>

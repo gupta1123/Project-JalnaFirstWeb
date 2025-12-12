@@ -526,6 +526,15 @@ const messages: Record<Lang, Messages> = {
     "staff.changePassword.error": "Password must be at least 6 characters",
     "staff.changePassword.comingSoon": "Change password API coming soon",
     "staff.delete.comingSoon": "Delete staff API coming soon",
+    "staff.delete.title": "Delete Staff Member",
+    "staff.delete.description": "This action cannot be undone.",
+    "staff.delete.confirmMessage": "Are you sure you want to delete",
+    "staff.delete.warning": "This will permanently remove the staff member from the system.",
+    "staff.delete.cancel": "Cancel",
+    "staff.delete.deleting": "Deleting...",
+    "staff.delete.delete": "Delete",
+    "staff.delete.success": "Staff member deleted successfully",
+    "staff.delete.error": "Failed to delete staff member",
 
     // Create Staff page
     "staff.create.title": "Create Staff Member",
@@ -803,7 +812,7 @@ const messages: Record<Lang, Messages> = {
     // Login page
     "login.loading": "Loading...",
     "login.heading": "Welcome back",
-    "login.subheading": "Login to your Maza Jalna admin",
+    "login.subheading": "Login to your my Jalna admin",
     "login.labels.email": "Email",
     "login.labels.password": "Password",
     "login.placeholder.email": "m@example.com",
@@ -1438,6 +1447,15 @@ const messages: Record<Lang, Messages> = {
     "staff.changePassword.error": "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए",
     "staff.changePassword.comingSoon": "पासवर्ड बदलने की API जल्द ही आ रही है",
     "staff.delete.comingSoon": "स्टाफ हटाने की API जल्द ही आ रही है",
+    "staff.delete.title": "स्टाफ सदस्य हटाएं",
+    "staff.delete.description": "इस क्रिया को पूर्ववत नहीं किया जा सकता।",
+    "staff.delete.confirmMessage": "क्या आप वाकई हटाना चाहते हैं",
+    "staff.delete.warning": "यह स्टाफ सदस्य को सिस्टम से स्थायी रूप से हटा देगा।",
+    "staff.delete.cancel": "रद्द करें",
+    "staff.delete.deleting": "हटा रहे हैं...",
+    "staff.delete.delete": "हटाएं",
+    "staff.delete.success": "स्टाफ सदस्य सफलतापूर्वक हटा दिया गया",
+    "staff.delete.error": "स्टाफ सदस्य को हटाने में विफल",
 
     // Create Staff page
     "staff.create.title": "स्टाफ सदस्य बनाएं",
@@ -2351,6 +2369,16 @@ const messages: Record<Lang, Messages> = {
     "staff.changePassword.error": "पासवर्ड किमान 6 अक्षरी असावा",
     "staff.changePassword.comingSoon": "पासवर्ड बदलण्याची API लवकरच येणार आहे",
     "staff.delete.comingSoon": "कर्मचारी हटवण्याची API लवकरच येणार आहे",
+    "staff.delete.title": "कर्मचारी सदस्य हटवा",
+    "staff.delete.description": "ही क्रिया पूर्ववत केली जाऊ शकत नाही.",
+    "staff.delete.confirmMessage": "तुम्हाला खरोखर हटवायचे आहे का",
+    "staff.delete.warning": "हे कर्मचारी सदस्याला सिस्टममधून कायमस्वरूपी काढून टाकेल.",
+    "staff.delete.cancel": "रद्द करा",
+    "staff.delete.deleting": "हटवत आहे...",
+    "staff.delete.delete": "हटवा",
+    "staff.delete.success": "कर्मचारी सदस्य यशस्वीरित्या हटवला",
+    "staff.delete.error": "कर्मचारी सदस्य हटवण्यात अयशस्वी",
+    // "staff.delete.comingSoon": "कर्मचारी हटवण्याची API लवकरच येणार आहे",
 
     // Create Staff page
     "staff.create.title": "कर्मचारी सदस्य तयार करा",

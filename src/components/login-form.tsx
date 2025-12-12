@@ -232,10 +232,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="Maza Jalna" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.25] dark:grayscale" />
+            <img src="https://images.unsplash.com/photo-1505761671935-60b3a7427bad?q=80&w=1600&auto=format&fit=crop" alt="my Jalna" className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.25] dark:grayscale" />
             <div className="absolute inset-0 grid place-items-center">
               <div className="backdrop-blur-[2px] bg-background/40 dark:bg-black/30 rounded-md px-4 py-2 shadow-sm">
-                <div className="text-xl font-semibold tracking-tight">Maza Jalna</div>
+                <div className="text-xl font-semibold tracking-tight">my Jalna</div>
               </div>
             </div>
           </div>

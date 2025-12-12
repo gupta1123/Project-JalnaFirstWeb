@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   getStaff,
   updateStaff,
+  deleteUserByEmail,
 } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -100,15 +102,36 @@ export default function StaffPage() {
   }, [sortedStaff, currentPage, limit]);
 
   const [pwdTarget, setPwdTarget] = useState<User | null>(null);
-
+  const [staffToDelete, setStaffToDelete] = useState<User | null>(null);
 
   const onChangePassword = async (id: string, _newPwd: string) => {
     toast.info(tr(lang, "staff.changePassword.comingSoon"));
     setPwdTarget(null);
   };
 
-  const onDeleteStaff = async (id: string) => {
-    toast.info(tr(lang, "staff.delete.comingSoon"));
+  const onDeleteStaff = (staff: User) => {
+    setStaffToDelete(staff);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!staffToDelete?.email) {
+      toast.error(tr(lang, "staff.delete.error"));
+      setStaffToDelete(null);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await deleteUserByEmail(staffToDelete.email);
+      toast.success(tr(lang, "staff.delete.success"));
+      setStaffToDelete(null);
+      mutate();
+    } catch (error) {
+      console.error("Delete staff error:", error);
+      toast.error(tr(lang, "staff.delete.error"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -213,7 +236,7 @@ export default function StaffPage() {
                             <KeyRound className="size-4" /> {tr(lang, "staff.actions.changePassword")}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onDeleteStaff(s._id)} className="text-red-600">
+                          <DropdownMenuItem onClick={() => onDeleteStaff(s)} className="text-red-600">
                             <Trash2 className="size-4" /> {tr(lang, "staff.actions.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -266,6 +289,59 @@ export default function StaffPage() {
           {pwdTarget && (
             <ChangePasswordForm staff={pwdTarget} onSubmit={onChangePassword} submitting={submitting} lang={lang} />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Staff Confirmation Dialog */}
+      <Dialog open={!!staffToDelete} onOpenChange={(open) => !open && setStaffToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle>{tr(lang, "staff.delete.title")}</DialogTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {tr(lang, "staff.delete.description")}
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          {staffToDelete && (
+            <div className="py-4">
+              <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/50">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="text-sm font-medium">
+                    {(staffToDelete.fullName || staffToDelete.email || "S").charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="font-medium">{staffToDelete.fullName || staffToDelete.email}</div>
+                  <div className="text-sm text-muted-foreground">{staffToDelete.email}</div>
+                  {staffToDelete.phoneNumber && (
+                    <div className="text-sm text-muted-foreground">{staffToDelete.phoneNumber}</div>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mt-4">
+                {tr(lang, "staff.delete.confirmMessage")} <strong>{staffToDelete.fullName || staffToDelete.email}</strong>?{" "}
+                {tr(lang, "staff.delete.warning")}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={submitting}>
+                {tr(lang, "staff.delete.cancel")}
+              </Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={submitting}>
+              {submitting ? tr(lang, "staff.delete.deleting") : tr(lang, "staff.delete.delete")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

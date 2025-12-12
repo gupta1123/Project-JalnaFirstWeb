@@ -18,17 +18,17 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Maza Jalna",
-    template: "%s – Maza Jalna",
+    default: "my Jalna",
+    template: "%s – my Jalna",
   },
-  applicationName: "Maza Jalna",
-  description: "Maza Jalna Admin Panel",
+  applicationName: "my Jalna",
+  description: "my Jalna Admin Panel",
   icons: {
     icon: [
-      { url: "/logo.png", type: "image/png" },
+      { url: "/MyJalna.png", type: "image/png" },
     ],
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    shortcut: "/MyJalna.png",
+    apple: "/MyJalna.png",
   },
 };
 

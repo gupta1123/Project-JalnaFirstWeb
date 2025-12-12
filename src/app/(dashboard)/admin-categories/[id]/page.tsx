@@ -51,6 +51,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SubCategory } from "@/lib/types";
 
 export default function CategoryDetailPage() {
@@ -391,9 +392,31 @@ export default function CategoryDetailPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-[400px]" title={subcategory.description}>
-                        {subcategory.description}
-                      </div>
+                      {subcategory.description && subcategory.description.length > 60 ? (
+                        <Tooltip delayDuration={200}>
+                          <TooltipTrigger asChild>
+                            <div className="max-w-[400px] cursor-help">
+                              <p className="truncate">{subcategory.description}</p>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            sideOffset={8}
+                            className="max-w-md p-4 text-sm bg-popover text-popover-foreground border shadow-lg rounded-lg"
+                          >
+                            <div className="font-medium mb-2 text-xs text-muted-foreground uppercase tracking-wide">
+                              Description
+                            </div>
+                            <div className="whitespace-pre-wrap break-words leading-relaxed">
+                              {subcategory.description}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <div className="max-w-[400px]">
+                          <p className="truncate">{subcategory.description}</p>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div>
