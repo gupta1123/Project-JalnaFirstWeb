@@ -26,7 +26,16 @@ const FALLBACK_CATEGORY_NAMES = [
   "Traffic and Transport",
   "Livelihood and Local Order",
 ] as const;
-const STATUS_VALUES = ["open", "in_progress", "assigned", "resolved", "closed"] as const;
+const STATUS_VALUES = [
+  "open",
+  "in_progress",
+  "assigned",
+  "resolved",
+  "closed",
+  "reopened_assigned",
+  "reopened_in_progress",
+  "reopened_resolved",
+] as const;
 const PRIORITY_VALUES = ["low", "medium", "high", "urgent"] as const;
 
 type StatusValue = (typeof STATUS_VALUES)[number];
@@ -85,7 +94,16 @@ export default function ComplaintsPage() {
     (!categoriesForFilter || categoriesRevalidating) &&
     categoryOptions.length === 0;
   const params = useMemo(() => {
-    const allowed = new Set(["open", "in_progress", "assigned", "resolved", "closed"]);
+    const allowed = new Set([
+      "open",
+      "in_progress",
+      "assigned",
+      "resolved",
+      "closed",
+      "reopened_assigned",
+      "reopened_in_progress",
+      "reopened_resolved",
+    ]);
     const p: Record<string, string | number> = { page, limit, sortBy: "createdAt", sortOrder: "desc" };
     if (search && search.trim()) p.search = search.trim();
     if (status && allowed.has(status)) p.status = status;
@@ -137,6 +155,9 @@ export default function ComplaintsPage() {
       'assigned': 'assigned',
       'resolved': 'resolved',
       'closed': 'closed',
+      'reopened_assigned': 'reopenedAssigned',
+      'reopened_in_progress': 'reopenedInProgress',
+      'reopened_resolved': 'reopenedResolved',
     };
     return statusMap[status] || status;
   };
@@ -490,6 +511,8 @@ export default function ComplaintsPage() {
                       t.status === 'open' ? 'rounded px-2 py-0.5 text-xs bg-sky-500/15 text-sky-700 dark:text-sky-300' :
                       t.status === 'in_progress' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
                       t.status === 'resolved' ? 'rounded px-2 py-0.5 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+                      t.status === 'reopened_in_progress' ? 'rounded px-2 py-0.5 text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                      t.status === 'reopened_resolved' ? 'rounded px-2 py-0.5 text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
                       'rounded px-2 py-0.5 text-xs bg-neutral-500/15 text-neutral-700 dark:text-neutral-300'
                     }>{tr(lang, `complaints.status.${getStatusKey(t.status)}`)}</span>
                   </TableCell>

@@ -329,6 +329,30 @@ export async function adminGetTicketById(id: string): Promise<Ticket> {
   return res.data.ticket as Ticket;
 }
 
+export async function adminReassignTicketCategory(
+  ticketId: string,
+  payload: { categoryId: string; subCategoryId?: string | null }
+) {
+  const body: Record<string, unknown> = { categoryId: payload.categoryId };
+  if (payload.subCategoryId !== undefined && payload.subCategoryId !== null && payload.subCategoryId !== "") {
+    body.subCategoryId = payload.subCategoryId;
+  }
+  const res = await api.put(`/api/tickets/admin/${ticketId}/reassign-category`, body);
+  return res.data as {
+    message: string;
+    ticket: Ticket;
+  };
+}
+
+export async function reopenTicket(ticketId: string) {
+  const res = await api.post(`/api/tickets/${ticketId}/reopen`, {});
+  return res.data as {
+    message: string;
+    status: TicketStatus;
+    reopenedCount: number;
+  };
+}
+
 export async function adminUpdateTicketStatus(id: string, payload: { status?: TicketStatus; resolutionNote?: string; slaDueDate?: string }) {
   const res = await api.put(`/api/tickets/admin/${id}`, payload);
   return res.data as { message: string; ticket: Ticket };
@@ -630,7 +654,7 @@ export async function markTicketComplete(ticketId: string) {
 
 // Update ticket status (for staff) - using team endpoint
 export async function updateTicketStatusTeam(ticketId: string, payload: {
-  status: "in_progress" | "pending_user" | "pending_admin" | "resolved";
+  status: "in_progress" | "pending_user" | "pending_admin" | "resolved" | "reopened_in_progress" | "reopened_resolved" | "reopened_assigned";
 }) {
   const res = await api.put(`/api/tickets/team/${ticketId}/status`, payload);
   return res.data as { message: string; ticket?: Ticket };

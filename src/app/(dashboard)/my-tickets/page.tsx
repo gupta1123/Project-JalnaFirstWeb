@@ -254,6 +254,15 @@ export default function MyTicketsPage() {
                   <SelectItem value="in_progress">
                     {tr(lang, "teamTickets.filters.status.inProgress")}
                   </SelectItem>
+                  <SelectItem value="reopened_assigned">
+                    Reopened assigned
+                  </SelectItem>
+                  <SelectItem value="reopened_in_progress">
+                    Reopened in progress
+                  </SelectItem>
+                  <SelectItem value="reopened_resolved">
+                    Reopened resolved
+                  </SelectItem>
                   <SelectItem value="resolved">
                     {tr(lang, "teamTickets.filters.status.resolved")}
                   </SelectItem>
@@ -402,12 +411,18 @@ export default function MyTicketsPage() {
                         variant={
                           ticket.status === "open" ? "secondary" :
                           ticket.status === "in_progress" ? "default" :
+                          ticket.status === "reopened_assigned" ? "secondary" :
+                          ticket.status === "reopened_in_progress" ? "default" :
+                          ticket.status === "reopened_resolved" ? "secondary" :
                           ticket.status === "resolved" ? "secondary" :
                           "outline"
                         }
                         className={
                           ticket.status === "open" ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" :
                           ticket.status === "in_progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
+                          ticket.status === "reopened_assigned" ? "bg-purple-500/15 text-purple-700 dark:text-purple-300" :
+                          ticket.status === "reopened_in_progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" :
+                          ticket.status === "reopened_resolved" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
                           ticket.status === "resolved" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" :
                           "bg-neutral-500/15 text-neutral-700 dark:text-neutral-300"
                         }

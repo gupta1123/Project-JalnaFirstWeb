@@ -52,12 +52,18 @@ import {
   getTeamById,
 } from "@/lib/api";
 import { formatDateTimeSmart } from "@/lib/utils";
-import { Ticket, User } from "@/lib/types";
+import { Ticket, TicketStatus, User } from "@/lib/types";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 import { getTicketStatusLabel } from "@/lib/status";
 
 type ProofAttachment = { id: string; file: File; previewUrl: string; name: string };
+
+// Fallback updater hitting /api/tickets/:ticketId directly (no admin/team suffixes)
+async function updateTicketStatusDirect(ticketId: string, status: TicketStatus) {
+  const res = await api.put(`/api/tickets/${ticketId}`, { status });
+  return res.data;
+}
 
 // Fetcher function for SWR
 const fetcher = (url: string) => api.get(url).then(res => res.data);
@@ -76,6 +82,9 @@ const getStatusBadge = (status: string | undefined, lang: "en" | "hi" | "mr") =>
     open: { variant: "secondary" as const, className: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
     in_progress: { variant: "default" as const, className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
     assigned: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
+    reopened_assigned: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
+    reopened_in_progress: { variant: "default" as const, className: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+    reopened_resolved: { variant: "secondary" as const, className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
     pending_user: { variant: "secondary" as const, className: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
     pending_admin: { variant: "secondary" as const, className: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
     resolved: { variant: "secondary" as const, className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
@@ -362,9 +371,20 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
 
     try {
       setUpdatingStatus(true);
-      await updateTicketStatusTeam(id, {
-        status: "in_progress",
-      });
+      const isReopened = ticket.status === "reopened_assigned";
+      const nextStatus: TicketStatus = isReopened ? "reopened_in_progress" : "in_progress";
+
+      try {
+        await updateTicketStatusTeam(id, { status: nextStatus });
+      } catch (error: unknown) {
+        const statusCode = (error as { response?: { status?: number } })?.response?.status;
+        if (isReopened && (statusCode === 400 || statusCode === 403)) {
+          // Backend rejected reopened status on team endpoint; fallback to direct ticket status endpoint.
+          await updateTicketStatusDirect(id, nextStatus);
+        } else {
+          throw error;
+        }
+      }
       toast.success(tr(lang, "ticketDetail.workStartedSuccessfully"));
       mutate(); 
     } catch (error: unknown) {
@@ -399,9 +419,20 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
       );
 
       // 2) Update status to resolved
-      await updateTicketStatusTeam(id, {
-        status: "resolved",
-      });
+      const isReopened = ticket.status === "reopened_in_progress";
+      const nextStatus: TicketStatus = isReopened ? "reopened_resolved" : "resolved";
+
+      try {
+        await updateTicketStatusTeam(id, { status: nextStatus });
+      } catch (error: unknown) {
+        const statusCode = (error as { response?: { status?: number } })?.response?.status;
+        if (isReopened && (statusCode === 400 || statusCode === 403)) {
+          // Backend rejected reopened status on team endpoint; fallback to direct ticket status endpoint.
+          await updateTicketStatusDirect(id, nextStatus);
+        } else {
+          throw error;
+        }
+      }
 
       toast.success(tr(lang, "ticketDetail.ticketMarkedResolved"));
       mutate(); // Refresh the ticket data
@@ -838,7 +869,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               
               {/* Status Action Buttons */}
               <div className="space-y-3">
-                {ticket?.status === "assigned" && canUpdateStatus && (
+                {(ticket?.status === "assigned" || ticket?.status === "reopened_assigned") && canUpdateStatus && (
                   <Button 
                     onClick={handleStartWork}
                     disabled={updatingStatus || isClosed}
@@ -859,7 +890,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                   </Button>
                 )}
 
-                {ticket?.status === "in_progress" && canUpdateStatus && (
+                {(ticket?.status === "in_progress" || ticket?.status === "reopened_in_progress") && canUpdateStatus && (
                   <>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">

@@ -8,6 +8,9 @@ const statusTranslationKeyMap: Record<string, string> = {
   pending_admin: "teamTickets.status.pendingAdmin",
   resolved: "teamTickets.status.resolved",
   closed: "teamTickets.status.closed",
+  reopened_assigned: "complaints.status.reopenedAssigned",
+  reopened_in_progress: "complaints.status.reopenedInProgress",
+  reopened_resolved: "complaints.status.reopenedResolved",
 };
 
 export function getTicketStatusLabel(lang: Lang, status?: string) {
@@ -16,6 +19,6 @@ export function getTicketStatusLabel(lang: Lang, status?: string) {
   if (translationKey) {
     return tr(lang, translationKey);
   }
-  return status.replace("_", " ");
+  return status.replace(/_/g, " ");
 }
 

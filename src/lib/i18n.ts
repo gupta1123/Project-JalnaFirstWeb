@@ -259,6 +259,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.filters.status.assigned": "Assigned",
     "complaints.filters.status.resolved": "Resolved",
     "complaints.filters.status.closed": "Closed",
+    "complaints.filters.status.reopenedAssigned": "Reopened (assigned)",
+    "complaints.filters.status.reopenedInProgress": "Reopened (in progress)",
+    "complaints.filters.status.reopenedResolved": "Reopened (resolved)",
     "complaints.filters.category": "Category",
     "complaints.filters.category.all": "All categories",
     "complaints.filters.category.sanitation": "Sanitation",
@@ -303,6 +306,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.status.assigned": "assigned",
     "complaints.status.resolved": "resolved",
     "complaints.status.closed": "closed",
+    "complaints.status.reopenedAssigned": "reopened assigned",
+    "complaints.status.reopenedInProgress": "reopened in progress",
+    "complaints.status.reopenedResolved": "reopened resolved",
 
     // Complaint detail page
     "complaintDetail.copy": "Copy",
@@ -1180,6 +1186,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.filters.status.assigned": "सौंपा गया",
     "complaints.filters.status.resolved": "सुलझा",
     "complaints.filters.status.closed": "बंद",
+    "complaints.filters.status.reopenedAssigned": "पुनः खोला (सौंपा गया)",
+    "complaints.filters.status.reopenedInProgress": "पुनः खोला (प्रगति पर)",
+    "complaints.filters.status.reopenedResolved": "पुनः खोला (सुलझा)",
     "complaints.filters.category": "श्रेणी",
     "complaints.filters.category.all": "सभी श्रेणियाँ",
     "complaints.filters.category.sanitation": "सफाई",
@@ -1224,6 +1233,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.status.assigned": "सौंपा गया",
     "complaints.status.resolved": "सुलझा",
     "complaints.status.closed": "बंद",
+    "complaints.status.reopenedAssigned": "पुनः खोला (सौंपा गया)",
+    "complaints.status.reopenedInProgress": "पुनः खोला (प्रगति पर)",
+    "complaints.status.reopenedResolved": "पुनः खोला (सुलझा)",
 
     // Complaint detail page
     "complaintDetail.copy": "कॉपी करें",
@@ -2102,6 +2114,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.filters.status.assigned": "असाइन",
     "complaints.filters.status.resolved": "निकाली",
     "complaints.filters.status.closed": "बंद",
+    "complaints.filters.status.reopenedAssigned": "पुन्हा उघडले (असाइन)",
+    "complaints.filters.status.reopenedInProgress": "पुन्हा उघडले (प्रगतीत)",
+    "complaints.filters.status.reopenedResolved": "पुन्हा उघडले (निकाली)",
     "complaints.filters.category": "श्रेणी",
     "complaints.filters.category.all": "सर्व श्रेणी",
     "complaints.filters.category.sanitation": "स्वच्छता",
@@ -2146,6 +2161,9 @@ const messages: Record<Lang, Messages> = {
     "complaints.status.assigned": "असाइन",
     "complaints.status.resolved": "निकाली",
     "complaints.status.closed": "बंद",
+    "complaints.status.reopenedAssigned": "पुन्हा उघडले (असाइन)",
+    "complaints.status.reopenedInProgress": "पुन्हा उघडले (प्रगतीत)",
+    "complaints.status.reopenedResolved": "पुन्हा उघडले (निकाली)",
 
     // Complaint detail page
     "complaintDetail.copy": "कॉपी करा",

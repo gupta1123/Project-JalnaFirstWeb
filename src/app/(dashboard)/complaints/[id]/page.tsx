@@ -7,10 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarClock, Hash, Tag, Flag, MapPin, Clipboard, Users, FileText, ExternalLink, Eye, Image, Video, File, User as UserIcon } from "lucide-react";
 import { formatDateTimeSmart } from "@/lib/utils";
 import type { Ticket, TicketStatus, User } from "@/lib/types";
-import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments } from "@/lib/api";
+import { adminGetTicketById, adminAddNote, adminGetTicketHistory, getTicketAttachments, getCategories, getSubCategories, adminReassignTicketCategory } from "@/lib/api";
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,6 +44,9 @@ export default function ComplaintDetailPage() {
       'assigned': 'assigned',
       'resolved': 'resolved',
       'closed': 'closed',
+      'reopened_assigned': 'reopenedAssigned',
+      'reopened_in_progress': 'reopenedInProgress',
+      'reopened_resolved': 'reopenedResolved',
     };
     return statusMap[status] || status;
   };
@@ -78,6 +82,135 @@ export default function ComplaintDetailPage() {
     () => getTicketAttachments(id),
     { revalidateOnFocus: false }
   );
+
+  const { data: categoriesResp, isLoading: isLoadingCategories } = useSWR(
+    "categories",
+    () => getCategories({ page: 1, limit: 100 }),
+    { revalidateOnFocus: false }
+  );
+  const categories = categoriesResp?.categories ?? [];
+
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [selectedSubCategoryId, setSelectedSubCategoryId] = useState<string>("");
+  const [reassigningCategory, setReassigningCategory] = useState(false);
+
+  const initialCategoryId = useMemo(() => {
+    const cat = ticket?.category as unknown;
+    if (!cat) return "";
+    if (typeof cat === "string") return cat;
+    if (typeof cat === "object") {
+      const obj = cat as { id?: string; _id?: string };
+      return obj.id || obj._id || "";
+    }
+    return "";
+  }, [ticket?.category]);
+
+  const initialSubCategoryId = useMemo(() => {
+    const sub = (ticket as unknown as { subCategory?: { id?: string; _id?: string } })?.subCategory;
+    if (!sub) return "";
+    return sub.id || sub._id || "";
+  }, [ticket]);
+
+  useEffect(() => {
+    if (initialCategoryId && !selectedCategoryId) {
+      setSelectedCategoryId(initialCategoryId);
+    }
+    if (initialSubCategoryId) {
+      setSelectedSubCategoryId(initialSubCategoryId);
+    }
+  }, [initialCategoryId, initialSubCategoryId, selectedCategoryId]);
+
+  const { data: subCategoriesResp, isLoading: isLoadingSubCategories } = useSWR(
+    selectedCategoryId ? ["ticket-subcategories-admin", selectedCategoryId] : null,
+    // Keep params aligned with Categories page; backend may reject very large limits.
+    () => getSubCategories({ page: 1, limit: 100, category: selectedCategoryId }),
+    { revalidateOnFocus: false }
+  );
+  const subCategories = subCategoriesResp?.subcategories ?? [];
+
+  // Fetch all subcategories to avoid showing old category/subcategory values duplicated as tags.
+  const { data: allSubCategoriesResp } = useSWR(
+    "subcategories",
+    () => getSubCategories({ page: 1, limit: 100 }),
+    { revalidateOnFocus: false }
+  );
+  const allSubCategories = allSubCategoriesResp?.subcategories ?? [];
+
+  const hasCategoryChanged = useMemo(() => {
+    if (!selectedCategoryId) return false;
+    const subInitial = initialSubCategoryId || "";
+    const subSelected = selectedSubCategoryId || "";
+    return selectedCategoryId !== initialCategoryId || subSelected !== subInitial;
+  }, [initialCategoryId, initialSubCategoryId, selectedCategoryId, selectedSubCategoryId]);
+
+  // When a category is selected, auto-select the first subcategory (if available) for convenience.
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      return;
+    }
+    type SubCategoryItem = { id?: string; _id?: string; name?: string };
+    const subsTyped = subCategories as SubCategoryItem[];
+    const firstSub =
+      subsTyped.find((s) => s.id === selectedSubCategoryId || s._id === selectedSubCategoryId) ||
+      subsTyped[0];
+    const firstId = firstSub?.id ?? firstSub?._id;
+    if (firstId && selectedSubCategoryId !== firstId) {
+      setSelectedSubCategoryId(firstId);
+    }
+  }, [selectedCategoryId, subCategories, selectedSubCategoryId]);
+
+  const currentCategoryName = useMemo(() => {
+    if (!ticket?.category) return "";
+    type CategoryItem = { id?: string; _id?: string; name?: string };
+    if (typeof ticket.category === "string") {
+      const match = categories.find((c: CategoryItem) => c.id === ticket.category || c._id === ticket.category);
+      return match?.name || ticket.category;
+    }
+    if (typeof ticket.category === "object" && "name" in ticket.category) {
+      return (ticket.category as { name?: string }).name || "";
+    }
+    return "";
+  }, [categories, ticket?.category]);
+
+  const currentSubCategoryName = useMemo(() => {
+    const sub = (ticket as unknown as { subCategory?: { name?: string; id?: string; _id?: string } })?.subCategory;
+    if (!sub) return "";
+    if (sub.name) return sub.name;
+    type SubCategoryItem = { id?: string; _id?: string; name?: string };
+    const match = subCategories.find((s: SubCategoryItem) => s.id === sub.id || s._id === sub._id);
+    return match?.name || sub.id || sub._id || "";
+  }, [subCategories, ticket]);
+
+  const visibleTags = useMemo(() => {
+    const raw = (ticket?.tags ?? []).filter((t) => typeof t === "string" && t.trim()) as string[];
+    const norm = (v: string) => v.trim().toLowerCase();
+    const exclude = new Set<string>();
+
+    // Exclude current category/subcategory
+    [currentCategoryName, currentSubCategoryName].filter(Boolean).forEach((v) => exclude.add(norm(v)));
+
+    // Exclude any known category names (tickets sometimes store these in tags)
+    type CategoryItem = { id?: string; _id?: string; name?: string };
+    (categories as CategoryItem[]).forEach((c) => {
+      const name = typeof c?.name === "string" ? c.name : "";
+      if (name) exclude.add(norm(name));
+    });
+
+    // Exclude any known subcategory names (tickets sometimes store these in tags)
+    type SubCategoryItem = { id?: string; _id?: string; name?: string };
+    (allSubCategories as SubCategoryItem[]).forEach((s) => {
+      const name = typeof s?.name === "string" ? s.name : "";
+      if (name) exclude.add(norm(name));
+    });
+
+    const unique = new Map<string, string>();
+    raw.forEach((t) => {
+      const key = norm(t);
+      if (!key || exclude.has(key) || unique.has(key)) return;
+      unique.set(key, t.trim());
+    });
+    return Array.from(unique.values());
+  }, [ticket?.tags, currentCategoryName, currentSubCategoryName, categories, allSubCategories]);
 
   type AttachmentItem = {
     _id: string;
@@ -142,6 +275,7 @@ export default function ComplaintDetailPage() {
     size: number;
     mimeType: string;
   } | null>(null);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const isImage = (m?: string) => Boolean(m && m.startsWith("image/"));
   const isVideo = (m?: string) => Boolean(m && m.startsWith("video/"));
   const isPdf = (m?: string) => m === "application/pdf";
@@ -151,6 +285,9 @@ export default function ComplaintDetailPage() {
     if (s === "in_progress") return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20";
     if (s === "assigned") return "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/20";
     if (s === "resolved") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+    if (s === "reopened_assigned") return "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/20";
+    if (s === "reopened_in_progress") return "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20";
+    if (s === "reopened_resolved") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
     if (s === "closed") return "bg-muted text-muted-foreground border-muted-foreground/20";
     return "";
   }
@@ -173,6 +310,28 @@ export default function ComplaintDetailPage() {
       toast.error(tr(lang, "complaintDetail.addNoteModal.error"));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleReassignCategory() {
+    if (!selectedCategoryId) {
+      toast.error("Select a category first");
+      return;
+    }
+    setReassigningCategory(true);
+    try {
+      await adminReassignTicketCategory(id, {
+        categoryId: selectedCategoryId,
+        subCategoryId: selectedSubCategoryId || undefined,
+      });
+      toast.success("Category updated and ticket reassigned");
+      await mutate();
+      await mutateHistory();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update category. Please try again.");
+    } finally {
+      setReassigningCategory(false);
     }
   }
 
@@ -215,10 +374,25 @@ export default function ComplaintDetailPage() {
               <div className="text-base font-medium break-words break-all whitespace-pre-wrap">{ticket.title}</div>
               <div className="text-sm text-muted-foreground leading-relaxed break-words break-all whitespace-pre-wrap">{ticket.description}</div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="size-3.5" /> {tr(lang, "complaintDetail.created")}: {created} • {tr(lang, "complaintDetail.updated")}: {updated}</div>
-              {ticket.tags && ticket.tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {currentCategoryName && (
+                  <Badge variant="secondary" className="capitalize">
+                    {currentCategoryName}
+                  </Badge>
+                )}
+                {currentSubCategoryName && (
+                  <Badge variant="outline" className="capitalize">
+                    {currentSubCategoryName}
+                  </Badge>
+                )}
+                <Button size="sm" variant="outline" onClick={() => setCategoryDialogOpen(true)}>
+                  Change category
+                </Button>
+              </div>
+              {visibleTags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {ticket.tags.map((t, i) => (
-                    <Badge key={i} variant="outline" className="text-xs">{t}</Badge>
+                  {visibleTags.map((t, i) => (
+                    <Badge key={`${t}-${i}`} variant="outline" className="text-xs">{t}</Badge>
                   ))}
             </div>
               )}
@@ -655,6 +829,129 @@ export default function ComplaintDetailPage() {
               )
             ) : null}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change category modal */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Change category</DialogTitle>
+            <DialogDescription>
+              Pick a new category or subcategory. This will reopen the ticket and clear assignment.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <div className="text-xs text-muted-foreground">
+                <span>Category</span>
+              </div>
+              <Select
+                value={selectedCategoryId}
+                onValueChange={(value) => {
+                  setSelectedCategoryId(value);
+                  setSelectedSubCategoryId("");
+                }}
+                disabled={isLoadingCategories}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingCategories ? "Loading categories..." : "Select category"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingCategories && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
+                  )}
+                  {!isLoadingCategories && categories.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No categories found</div>
+                  )}
+                  {categories
+                    .filter((cat: { id?: string; _id?: string; name?: string }) => cat.id || cat._id)
+                    .map((cat: { id?: string; _id?: string; name?: string }) => (
+                      <SelectItem key={cat.id ?? cat._id ?? ""} value={cat.id ?? cat._id ?? ""}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="text-xs text-muted-foreground">
+                <span>Subcategory (optional)</span>
+              </div>
+              <Select
+                value={selectedSubCategoryId}
+                onValueChange={(value) => setSelectedSubCategoryId(value === "__clear_subcategory__" ? "" : value)}
+                disabled={!selectedCategoryId || isLoadingSubCategories}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      !selectedCategoryId
+                        ? "Select a category first"
+                        : isLoadingSubCategories
+                        ? "Loading subcategories..."
+                        : "Select subcategory (optional)"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {!selectedCategoryId && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Choose a category first</div>
+                  )}
+                  {selectedCategoryId && isLoadingSubCategories && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
+                  )}
+                  {selectedCategoryId && !isLoadingSubCategories && subCategories.length === 0 && (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No subcategories</div>
+                  )}
+                  {subCategories
+                    .filter((sub: { id?: string; _id?: string; name?: string }) => sub.id || sub._id)
+                    .map((sub: { id?: string; _id?: string; name?: string }) => (
+                      <SelectItem key={sub.id ?? sub._id ?? ""} value={sub.id ?? sub._id ?? ""}>
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  {selectedSubCategoryId && (
+                    <SelectItem value="__clear_subcategory__">Clear subcategory</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setSelectedCategoryId(initialCategoryId || "");
+                setSelectedSubCategoryId(initialSubCategoryId || "");
+                setCategoryDialogOpen(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectedCategoryId(initialCategoryId || "");
+                setSelectedSubCategoryId(initialSubCategoryId || "");
+              }}
+              disabled={!hasCategoryChanged}
+            >
+              Reset
+            </Button>
+            <Button
+              onClick={async () => {
+                await handleReassignCategory();
+                setCategoryDialogOpen(false);
+              }}
+              disabled={!hasCategoryChanged || reassigningCategory}
+            >
+              {reassigningCategory ? "Updating..." : "Save change"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>

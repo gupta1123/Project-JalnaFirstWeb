@@ -142,7 +142,10 @@ export type TicketStatus =
   | "pending_user"
   | "pending_admin"
   | "resolved"
-  | "closed";
+  | "closed"
+  | "reopened_assigned"
+  | "reopened_in_progress"
+  | "reopened_resolved";
 
 export type Ticket = {
   _id: string;
@@ -150,7 +153,19 @@ export type Ticket = {
   ticketNumber?: string;
   title: string;
   description: string;
-  category?: TicketCategory;
+  category?:
+    | TicketCategory
+    | {
+        id?: string;
+        _id?: string;
+        name?: string;
+      }
+    | null;
+  subCategory?: {
+    id?: string;
+    _id?: string;
+    name?: string;
+  } | null;
   priority?: TicketPriority;
   status: TicketStatus;
   createdBy?: User | string;
