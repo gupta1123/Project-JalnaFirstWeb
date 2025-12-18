@@ -869,9 +869,9 @@ export default function ComplaintDetailPage() {
                     .filter((cat: { id?: string; _id?: string; name?: string }) => cat.id || cat._id)
                     .map((cat: { id?: string; _id?: string; name?: string }) => (
                       <SelectItem key={cat.id ?? cat._id ?? ""} value={cat.id ?? cat._id ?? ""}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
+                      {cat.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -910,9 +910,9 @@ export default function ComplaintDetailPage() {
                     .filter((sub: { id?: string; _id?: string; name?: string }) => sub.id || sub._id)
                     .map((sub: { id?: string; _id?: string; name?: string }) => (
                       <SelectItem key={sub.id ?? sub._id ?? ""} value={sub.id ?? sub._id ?? ""}>
-                        {sub.name}
-                      </SelectItem>
-                    ))}
+                      {sub.name}
+                    </SelectItem>
+                  ))}
                   {selectedSubCategoryId && (
                     <SelectItem value="__clear_subcategory__">Clear subcategory</SelectItem>
                   )}

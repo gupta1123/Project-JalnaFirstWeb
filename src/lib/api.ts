@@ -125,6 +125,12 @@ export async function resetAdminPassword(payload: { email: string; newPassword: 
   return res.data as { message: string; admin: { id: string; email: string; role: string } };
 }
 
+// Reset password for a user (admin action)
+export async function adminResetUserPassword(payload: { userId: string; newPassword: string }) {
+  const res = await api.post("/api/auth/reset-password", payload);
+  return res.data as { message: string };
+}
+
 export async function checkSuperadmin(): Promise<{ exists: boolean; superadmin?: { id: string; email: string; firstName?: string; lastName?: string } }>{
   const res = await api.get("/api/setup/check-superadmin");
   return res.data;

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ArrowLeft, Save, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Save, User as UserIcon, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/components/LanguageProvider";
 import { tr } from "@/lib/i18n";
 
@@ -26,6 +26,7 @@ export default function CreateStaffPage() {
   const { lang } = useLanguage();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState<StaffFormData>({
     firstName: "",
@@ -201,15 +202,31 @@ export default function CreateStaffPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">{tr(lang, "staff.create.form.password")}</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                placeholder={tr(lang, "staff.create.form.placeholder.password")}
-                required
-                minLength={6}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder={tr(lang, "staff.create.form.placeholder.password")}
+                  required
+                  minLength={6}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
                 {tr(lang, "staff.create.form.passwordHelper")}
               </p>

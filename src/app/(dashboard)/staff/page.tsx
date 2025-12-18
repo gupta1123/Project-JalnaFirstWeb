@@ -8,6 +8,7 @@ import {
   getStaff,
   updateStaff,
   deleteUserByEmail,
+  adminResetUserPassword,
 } from "@/lib/api";
 import type { User } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,11 +37,13 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   Eye,
+  EyeOff,
   MoreVertical,
   Edit,
   KeyRound,
   Trash2,
   Plus,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -104,9 +107,18 @@ export default function StaffPage() {
   const [pwdTarget, setPwdTarget] = useState<User | null>(null);
   const [staffToDelete, setStaffToDelete] = useState<User | null>(null);
 
-  const onChangePassword = async (id: string, _newPwd: string) => {
-    toast.info(tr(lang, "staff.changePassword.comingSoon"));
-    setPwdTarget(null);
+  const onChangePassword = async (id: string, newPwd: string) => {
+    setSubmitting(true);
+    try {
+      await adminResetUserPassword({ userId: id, newPassword: newPwd });
+      toast.success(tr(lang, "staff.changePassword.success"));
+      setPwdTarget(null);
+    } catch (error) {
+      console.error("Change password error:", error);
+      toast.error(tr(lang, "staff.changePassword.errorFailed"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const onDeleteStaff = (staff: User) => {
@@ -141,12 +153,25 @@ export default function StaffPage() {
           <div className="flex items-center justify-between gap-2">
             <CardTitle>{tr(lang, "staff.title")}</CardTitle>
             <div className="flex items-center gap-2">
-              <Input
-                placeholder={tr(lang, "staff.searchPlaceholder")}
-                value={search}
-                onChange={(e) => { setPage(1); setSearch(e.target.value); }}
-                className="w-64"
-              />
+              <div className="relative">
+                <Input
+                  placeholder={tr(lang, "staff.searchPlaceholder")}
+                  value={search}
+                  onChange={(e) => { setPage(1); setSearch(e.target.value); }}
+                  className="w-64 pr-8"
+                />
+                {search && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-2 hover:bg-transparent"
+                    onClick={() => { setPage(1); setSearch(""); }}
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
               <Button asChild>
                 <Link href="/staff/create">
                   <Plus className="mr-2 size-4" /> {tr(lang, "staff.create")}
@@ -350,6 +375,7 @@ export default function StaffPage() {
 
 function ChangePasswordForm({ staff, onSubmit, submitting, lang }: { staff: User; onSubmit: (id: string, newPwd: string) => Promise<void>; submitting: boolean; lang: "en" | "hi" | "mr" }) {
   const [pwd, setPwd] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (pwd.length < 6) { toast.error(tr(lang, "staff.changePassword.error")); return; }
@@ -359,7 +385,28 @@ function ChangePasswordForm({ staff, onSubmit, submitting, lang }: { staff: User
     <form onSubmit={handleSubmit} className="grid gap-4">
       <div className="grid gap-2">
         <Label>{tr(lang, "staff.changePassword.newPassword")}</Label>
-        <Input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder={tr(lang, "staff.changePassword.placeholder")} />
+        <div className="relative">
+          <Input 
+            type={showPassword ? "text" : "password"} 
+            value={pwd} 
+            onChange={(e) => setPwd(e.target.value)} 
+            placeholder={tr(lang, "staff.changePassword.placeholder")}
+            className="pr-10"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            )}
+          </Button>
+        </div>
       </div>
       <DialogFooter>
         <DialogClose asChild>
