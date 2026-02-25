@@ -165,17 +165,19 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     revalidateOnFocus: false,
   });
   const isTeamLead = currentUser?.teams?.some((t) => t.isLeader) ?? false;
-  const leaderTeamId =
-    currentUser?.teams?.find((t) => t.isLeader)?.id ?? currentUser?.teams?.[0]?.id;
-
-  const { data: teamDetails } = useSWR(
-    isTeamLead && leaderTeamId ? ["team-details", leaderTeamId] : null,
-    () => getTeamById(leaderTeamId!),
-    { revalidateOnFocus: false }
-  );
-
-  const teamMembers =
-    teamDetails?.employees?.filter((member) => member._id !== teamDetails?.leaderId) ?? [];
+  const leaderTeamIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const team of currentUser?.teams ?? []) {
+      if (!team?.isLeader) continue;
+      const teamId = team.id || team._id;
+      if (teamId) ids.push(teamId);
+    }
+    return ids;
+  }, [currentUser?.teams]);
+  const fallbackLeaderTeamId =
+    leaderTeamIds[0] ??
+    currentUser?.teams?.[0]?.id ??
+    currentUser?.teams?.[0]?._id;
 
   // Ticket History
   type ChangeItem = { id: string; field?: string; oldValue?: string; newValue?: string; changeType?: string; description?: string; changedBy?: string; changedAt?: string };
@@ -196,6 +198,28 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     });
 
   const ticket = data?.ticket as Ticket | undefined;
+
+  // For reassignment, use members from the specific ticket team the current user leads.
+  const ticketLeaderTeamId = useMemo(() => {
+    for (const assignedTeam of ticket?.assignedTeams ?? []) {
+      const assignedTeamId =
+        (assignedTeam as { _id?: string; id?: string })._id ||
+        (assignedTeam as { _id?: string; id?: string }).id;
+      if (assignedTeamId && leaderTeamIds.includes(assignedTeamId)) {
+        return assignedTeamId;
+      }
+    }
+    return fallbackLeaderTeamId;
+  }, [ticket?.assignedTeams, leaderTeamIds, fallbackLeaderTeamId]);
+
+  const { data: teamDetails } = useSWR(
+    isTeamLead && ticketLeaderTeamId ? ["team-details", ticketLeaderTeamId] : null,
+    () => getTeamById(ticketLeaderTeamId!),
+    { revalidateOnFocus: false }
+  );
+
+  const teamMembers =
+    teamDetails?.employees?.filter((member) => member._id !== teamDetails?.leaderId) ?? [];
 
   type AttachmentItem = {
     _id: string;
@@ -236,16 +260,15 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
       (ticket.assignedUser as { id?: string }).id === currentUserId);
 
   const isLeaderForTicketTeam =
-    !!leaderTeamId &&
+    leaderTeamIds.length > 0 &&
     !!ticket?.assignedTeams?.some((t) => {
       const teamId = (t as { _id?: string; id?: string })._id || (t as { _id?: string; id?: string }).id;
-      return teamId === leaderTeamId;
+      return !!teamId && leaderTeamIds.includes(teamId);
     });
 
   const canUpdateStatus = !!ticket && isAssignedUser;
   const canAssignMember =
     !!ticket &&
-    !ticket.assignedUser &&
     isLeaderForTicketTeam &&
     ticket.status !== 'resolved' &&
     ticket.status !== 'closed';
@@ -490,6 +513,11 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
     } finally {
       setAssigningMember(false);
     }
+  };
+
+  const openAssignMemberDialog = () => {
+    setSelectedMemberId("");
+    setAssignMemberOpen(true);
   };
 
   const handleAddNote = async () => {
@@ -845,19 +873,6 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {canAssignMember && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-center"
-                  onClick={() => {
-                    setSelectedMemberId("");
-                    setAssignMemberOpen(true);
-                  }}
-                >
-                  {tr(lang, "teamTickets.actions.assign")}
-                </Button>
-              )}
               {/* Current Status */}
               <div className="p-3 bg-muted/30 rounded-lg border">
                 <div className="flex items-center justify-between mb-2">
@@ -1039,7 +1054,7 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                 {tr(lang, "ticketDetail.assignedTo")}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               {ticket.assignedUser ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -1086,6 +1101,16 @@ export default function StaffTicketDetailPage({ params }: StaffTicketDetailPageP
                     {tr(lang, "ticketDetail.noOneAssigned")}
                   </p>
                 </div>
+              )}
+              {canAssignMember && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={openAssignMemberDialog}
+                >
+                  {ticket.assignedUser ? "Reassign member" : tr(lang, "teamTickets.actions.assign")}
+                </Button>
               )}
             </CardContent>
           </Card>
