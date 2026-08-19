@@ -1,0 +1,410 @@
+'use client';
+
+import useSWR from 'swr';
+import { useParams, useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { api, adminGetTickets } from '@/lib/api';
+import Image from 'next/image';
+import { useLanguage } from '@/components/LanguageProvider';
+import { tr } from '@/lib/i18n';
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+  Shield,
+  CheckCircle2,
+  XCircle,
+  CalendarClock,
+  UserRound,
+  ArrowLeft,
+} from 'lucide-react';
+
+const fetcher = (url: string) => api.get(url).then((r) => r.data);
+
+/* -------------------- Types -------------------- */
+type Coordinates = { latitude?: number; longitude?: number };
+
+type User = {
+  _id: string;
+  id?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  phoneNumber?: string;
+  role?: string;
+  isActive?: boolean;
+  isBlocked?: boolean;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  profileVisibility?: 'public' | 'private' | string;
+  preferredLanguage?: string;
+  createdAt?: string;
+  lastActive?: string;
+  profilePhoto?: string; // can be file name or URL
+  profilePhotoUrl?: string; // absolute URL from backend
+  aadhaarNumber?: string;
+  education?: string;
+  occupation?: string;
+  businessDetails?: { businessType?: string };
+  adminPrivileges?: {
+    canManageUsers?: boolean;
+    canManageContent?: boolean;
+    canManageSettings?: boolean;
+    canUploadDocs?: boolean;
+    canEditPhoneNumbers?: boolean;
+  };
+  location?: {
+    coordinates?: Coordinates;
+    city?: string;
+    state?: string;
+    country?: string;
+  };
+  address?: {
+    line1?: string;
+    line2?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+  };
+};
+
+type UserResponse = { message?: string; user?: User };
+
+/* -------------------- Helpers -------------------- */
+const resolveProfileUrl = (primary?: string, fallback?: string) => {
+  const pick = primary || fallback;
+  if (!pick) return '';
+  if (/^https?:\/\//i.test(pick)) return pick;
+  return `/uploads/${pick}`;
+};
+
+const initials = (u?: User) => {
+  const n = u?.fullName || `${u?.firstName ?? ''} ${u?.lastName ?? ''}`;
+  return n
+    .split(' ')
+    .filter(Boolean)
+    .map((s) => s[0]?.toUpperCase())
+    .slice(0, 2)
+    .join('') || 'U';
+};
+
+// Aadhaar shown in full per request
+
+const fmtDate = (iso?: string) =>
+  iso
+    ? new Intl.DateTimeFormat('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Kolkata',
+      }).format(new Date(iso))
+    : '—';
+
+const relativeTime = (iso?: string) => {
+  if (!iso) return '—';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const sec = Math.round(diffMs / 1000);
+  const min = Math.round(sec / 60);
+  const hr = Math.round(min / 60);
+  const day = Math.round(hr / 24);
+  if (Math.abs(day) >= 1) return `${day}d ago`;
+  if (Math.abs(hr) >= 1) return `${hr}h ago`;
+  if (Math.abs(min) >= 1) return `${min}m ago`;
+  return `${sec}s ago`;
+};
+
+const mapsLink = (c?: Coordinates, city?: string) => {
+  const lat = c?.latitude;
+  const lon = c?.longitude;
+  if (lat == null || lon == null) return undefined;
+  const label = encodeURIComponent(city ?? 'Location');
+  return `https://maps.google.com/?q=${lat},${lon} (${label})`;
+};
+
+/* -------------------- Page -------------------- */
+export default function UserDetailPage() {
+  const { lang } = useLanguage();
+  const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const userId = params?.id as string;
+  const { data, isLoading } = useSWR<UserResponse>(userId ? `/api/users/${userId}` : null, fetcher);
+  const user = data?.user;
+  // User tickets (admin)
+  const { data: ticketsData } = useSWR(user?._id ? ["user-tickets", user._id] : null, () => adminGetTickets({ page: 1, limit: 5, userId: user?._id }), { revalidateOnFocus: false });
+  const userTickets = (ticketsData?.tickets ?? []).slice(0, 5);
+
+  const fullName = useMemo(() => user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User', [user]);
+  const today = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Asia/Kolkata',
+      }).format(new Date()),
+    []
+  );
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      {/* HEADER */}
+      <Card className="lg:col-span-3 overflow-hidden border-0 bg-transparent shadow-none">
+        <AnimatedGradientHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-primary-foreground">
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => router.back()} 
+                className="text-primary-foreground hover:bg-foreground/10"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button type="button" aria-label="Open profile photo" className="rounded-full">
+                    <Avatar className="h-14 w-14 ring-2 ring-foreground/20 bg-background/60 backdrop-blur">
+                      <AvatarImage src={resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto)} alt={fullName} />
+                      <AvatarFallback className="text-primary-foreground bg-foreground/10">{initials(user)}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[520px]">
+                  <DialogHeader>
+                    <DialogTitle className="sr-only">{tr(lang, "userDetail.profilePhoto")}</DialogTitle>
+                  </DialogHeader>
+                  {(() => {
+                    const url = resolveProfileUrl(user?.profilePhotoUrl, user?.profilePhoto);
+                    return url ? (
+                      <div className="flex items-center justify-center">
+                        <Image src={url} alt={fullName} width={480} height={480} className="rounded-lg object-cover" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center p-10">
+                        <Avatar className="h-40 w-40">
+                          <AvatarFallback className="text-4xl">{initials(user)}</AvatarFallback>
+                        </Avatar>
+                      </div>
+                    );
+                  })()}
+                </DialogContent>
+              </Dialog>
+              <div>
+                <div className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
+                  <UserRound className="h-5 w-5 opacity-90" /> {isLoading ? <Skeleton className="h-6 w-40" /> : fullName}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                  {user?.isActive ? (
+                    <Badge variant="secondary" className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> {tr(lang, "userDetail.status.active")}</Badge>
+                  ) : (
+                    <Badge variant="destructive" className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5" /> {tr(lang, "userDetail.status.inactive")}</Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex flex-wrap gap-2" />
+          </div>
+        </AnimatedGradientHeader>
+      </Card>
+
+      {/* LEFT: Contact & Profile */}
+      <Card className="lg:col-span-2">
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4">
+              <InfoItem icon={<Mail className="h-4 w-4" />} label={tr(lang, "userDetail.labels.email")} value={user?.email} copyable lang={lang} />
+              <InfoItem icon={<Phone className="h-4 w-4" />} label={tr(lang, "userDetail.labels.phone")} value={user?.phoneNumber} copyable lang={lang} />
+              <InfoItem icon={<Shield className="h-4 w-4" />} label={tr(lang, "userDetail.labels.mobileVerified")} value={user?.isPhoneVerified ? tr(lang, "userDetail.yes") : tr(lang, "userDetail.no")} chip lang={lang} />
+            </div>
+            <div className="space-y-4">
+              <InfoItem icon={<CalendarClock className="h-4 w-4" />} label={tr(lang, "userDetail.labels.joined")} value={fmtDate(user?.createdAt)} helper={relativeTime(user?.createdAt)} lang={lang} />
+              <InfoItem icon={<Shield className="h-4 w-4" />} label={tr(lang, "userDetail.labels.aadhaar")} value={user?.aadhaarNumber ?? '—'} lang={lang} />
+              <InfoItem icon={<Globe className="h-4 w-4" />} label={tr(lang, "userDetail.labels.preferredLanguage")} value={user?.preferredLanguage?.toUpperCase()} lang={lang} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+    <Card>
+        <CardHeader className="pb-2"><CardTitle>{tr(lang, "userDetail.labels.location")}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <InfoRow icon={<MapPin className="h-4 w-4" />} label={tr(lang, "userDetail.labels.address")} value={formatAddressLines(user?.address)} lang={lang} />
+          <InfoRow icon={<MapPin className="h-4 w-4" />} label={tr(lang, "userDetail.labels.coordinates")} value={coordsText(user?.location?.coordinates)} copyable lang={lang} />
+          {mapsLink(user?.location?.coordinates, user?.location?.city) && (
+            <Button size="sm" variant="secondary" asChild>
+              <a href={mapsLink(user?.location?.coordinates, user?.location?.city)} target="_blank" rel="noreferrer">{tr(lang, "userDetail.viewOnMap")}</a>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent tickets */}
+      <Card className="lg:col-span-3">
+        <CardHeader className="pb-2"><CardTitle>{tr(lang, "userDetail.labels.recentTickets")}</CardTitle></CardHeader>
+        <CardContent>
+          {userTickets.length === 0 ? (
+            <div className="text-sm text-muted-foreground">{tr(lang, "userDetail.noTickets")}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground">
+                  <tr className="text-left">
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.number")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.title")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.category")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.priority")}</th>
+                    <th className="py-2 pr-4">{tr(lang, "userDetail.table.status")}</th>
+                    <th className="py-2 pr-0">{tr(lang, "userDetail.table.created")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userTickets.map((t) => {
+                    const categoryDisplay = typeof t.category === 'string' 
+                      ? t.category 
+                      : (t.category && typeof t.category === 'object' 
+                        ? (t.category as { name?: string; _id?: string }).name || (t.category as { _id?: string })._id || '—'
+                        : '—');
+                    return (
+                      <tr key={t._id} className="border-t">
+                        <td className="py-2 pr-4">{t.ticketNumber ?? t._id}</td>
+                        <td className="py-2 pr-4 max-w-[280px] truncate">{t.title}</td>
+                        <td className="py-2 pr-4 capitalize">{categoryDisplay}</td>
+                        <td className="py-2 pr-4"><Badge className="capitalize">{t.priority}</Badge></td>
+                        <td className="py-2 pr-4"><Badge variant="outline" className="capitalize">{t.status?.replace(/_/g, ' ')}</Badge></td>
+                        <td className="py-2 pr-0">{fmtDate(t.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Admin privileges removed by request */}
+
+      {/* Styles for header gradient (static, high-contrast for both themes) */}
+      <style jsx global>{`
+        .animated-gradient-surface { position: relative; border-radius: 0.75rem; background-image: linear-gradient(135deg, var(--grad-from), var(--grad-to)); background-size: 100% 100%; }
+        .gradient-noise::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,.06) 1px, transparent 1px); background-size: 12px 12px; opacity: .14; mix-blend-mode: soft-light; }
+      `}</style>
+    </div>
+  );
+}
+
+/* -------------------- Subcomponents -------------------- */
+function AnimatedGradientHeader({ children }: { children: React.ReactNode }) {
+  const style = {
+    ['--grad-from' as unknown as string]: 'var(--primary)',
+    ['--grad-to' as unknown as string]: 'color-mix(in oklch, var(--primary) 45%, var(--accent))',
+  } as React.CSSProperties;
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+      <div style={style} className="animated-gradient-surface gradient-noise p-6 sm:p-8 text-primary-foreground">{children}</div>
+    </motion.div>
+  );
+}
+
+function InfoItem({ icon, label, value, helper, copyable, chip, lang }: { icon: React.ReactNode; label: string; value?: string; helper?: string; copyable?: boolean; chip?: boolean; lang?: "en" | "hi" | "mr" }) {
+  const [copied, setCopied] = useState(false);
+  const show = value && value.trim().length > 0 ? value : '—';
+  const handleCopy = async () => {
+    if (!copyable || !value) return;
+    try { await navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1200); } catch {}
+  };
+  const currentLang = lang || "en";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="text-xs text-muted-foreground flex items-center gap-2">{icon}<span>{label}</span></div>
+      <div className="flex items-center gap-2">
+        {chip ? (
+          <Badge variant={show === tr(currentLang, "userDetail.yes") ? 'default' : 'outline'}>{show}</Badge>
+        ) : (
+          <span className="text-sm font-medium">{show}</span>
+        )}
+        {copyable && value && (
+          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={handleCopy}>{copied ? tr(currentLang, "userDetail.copied") : tr(currentLang, "userDetail.copy")}</Button>
+        )}
+      </div>
+      {helper && <div className="text-[11px] text-muted-foreground">{helper}</div>}
+          </div>
+  );
+}
+
+function InfoRow({ icon, label, value, copyable, lang }: { icon: React.ReactNode; label: string; value?: string; copyable?: boolean; lang?: "en" | "hi" | "mr" }) {
+  const currentLang = lang || "en";
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 text-sm"><span className="text-muted-foreground">{icon}</span><span>{label}</span></div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium">{value && value.trim().length ? value : '—'}</span>
+        {copyable && value && (
+          <Button type="button" size="sm" variant="ghost" className="h-6 px-2" onClick={() => navigator.clipboard.writeText(value)}>{tr(currentLang, "userDetail.copy")}</Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PrivilegesGrid({ data }: { data?: User['adminPrivileges'] }) {
+  const rows = [
+    { key: 'canManageUsers', label: 'Manage users' },
+    { key: 'canManageContent', label: 'Manage content' },
+    { key: 'canManageSettings', label: 'Manage settings' },
+    { key: 'canUploadDocs', label: 'Upload documents' },
+    { key: 'canEditPhoneNumbers', label: 'Edit phone numbers' },
+  ] as const;
+  return (
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {rows.map((r) => {
+        const ok = (data && typeof data === 'object' ? (data as Record<string, unknown>)[r.key] : undefined) as boolean | undefined;
+        return (
+          <div key={r.key} className="flex items-center justify-between rounded-lg border p-3">
+            <span className="text-sm">{r.label}</span>
+            {ok ? (
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Allowed</Badge>
+            ) : (
+              <Badge variant="outline" className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5" /> Not allowed</Badge>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* -------------------- tiny utils -------------------- */
+function coordsText(c?: Coordinates) {
+  const lat = c?.latitude;
+  const lon = c?.longitude;
+  if (lat == null || lon == null) return undefined;
+  return `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+}
+
+function formatAddress(a?: User['address']) {
+  if (!a) return '';
+  return [a.line1, a.line2, [a.city, a.state].filter(Boolean).join(', '), a.zipCode, a.country]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function formatAddressLines(a?: User['address']) {
+  if (!a) return '';
+  const parts = [a.line1, a.line2, a.city];
+  return parts.filter(Boolean).join(', ');
+}
