@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { useState, useMemo } from "react";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Fragment, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Lock, Shield } from "lucide-react";
@@ -71,6 +71,9 @@ export default function UsersPageClient() {
   const totalUsers = sortedUsers.length;
   const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
   const currentPage = Math.min(page, totalPages);
+  const nearbyPages = [1, currentPage - 1, currentPage, currentPage + 1, totalPages]
+    .filter((pageNumber) => pageNumber >= 1 && pageNumber <= totalPages);
+  const pageNumbers = [...new Set(nearbyPages)].sort((a, b) => a - b);
   const visibleUsers = useMemo(() => {
     const start = (currentPage - 1) * limit;
     return sortedUsers.slice(start, start + limit);
@@ -242,13 +245,18 @@ export default function UsersPageClient() {
                         className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
                       />
                     </PaginationItem>
-                    {Array.from({ length: totalPages }).map((_, idx) => {
-                      const pageNumber = idx + 1;
-                      return (
-                        <PaginationItem key={pageNumber}>
+                    {pageNumbers.map((pageNumber, index) => (
+                      <Fragment key={pageNumber}>
+                        {index > 0 && pageNumber - pageNumbers[index - 1] > 1 && (
+                          <PaginationItem className="hidden lg:block">
+                            <PaginationEllipsis />
+                          </PaginationItem>
+                        )}
+                        <PaginationItem className={pageNumber === currentPage ? undefined : "hidden lg:block"}>
                           <PaginationLink
                             href="#"
                             isActive={pageNumber === currentPage}
+                            aria-label={`Go to page ${pageNumber}`}
                             onClick={(e) => {
                               e.preventDefault();
                               setPage(pageNumber);
@@ -257,8 +265,8 @@ export default function UsersPageClient() {
                             {pageNumber}
                           </PaginationLink>
                         </PaginationItem>
-                      );
-                    })}
+                      </Fragment>
+                    ))}
                     <PaginationItem>
                       <PaginationNext
                         href="#"
@@ -287,5 +295,3 @@ export default function UsersPageClient() {
     </>
   );
 }
-
-

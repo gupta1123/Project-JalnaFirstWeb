@@ -388,11 +388,9 @@ export default function DashboardPage() {
 
       {/* Role-based KPI STRIP */}
       {isAdmin && (
-        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 xl:col-span-3 sm:grid-cols-2">
           <StatsTile label={tr(lang, 'dashboard.kpi.admin.totalUsers')} value={overview?.totalUsers} loading={loadingOverview} />
-          <StatsTile label={tr(lang, 'dashboard.kpi.admin.newThisWeek')} value={overview?.totalUsers} loading={loadingOverview} tone="alt" />
           <StatsTile label={tr(lang, 'dashboard.kpi.admin.openComplaints')} value={ticketCounts.open} loading={loadingTickets} />
-          <StatsTile label={tr(lang, 'dashboard.kpi.admin.highPriority')} value={rawTicketStats?.byPriority?.find(p => p._id === 'high')?.count ?? 0} loading={loadingTickets} tone="warn" />
         </div>
       )}
       
